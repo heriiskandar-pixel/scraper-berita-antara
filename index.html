@@ -55,6 +55,12 @@
   a { color: #58a6ff; }
   .panah { opacity: 0.5; font-size: 11px; }
   #tabel-wrap { overflow-x: auto; max-height: 75vh; overflow-y: auto; }
+  td img {
+    width: 160px;
+    height: auto;
+    border-radius: 6px;
+    display: block;
+  }
 </style>
 </head>
 <body>
@@ -160,6 +166,8 @@ function renderTabel() {
       let nilai = baris[k];
       if (k === 'Link' && nilai) {
         html += `<td><a href="${nilai}" target="_blank" rel="noopener">buka</a></td>`;
+      } else if (k === 'URL Gambar' && nilai) {
+        html += `<td><a href="${nilai}" target="_blank" rel="noopener"><img src="${nilai}" loading="lazy" alt="gambar berita"></a></td>`;
       } else {
         html += `<td>${String(nilai ?? '')}</td>`;
       }
