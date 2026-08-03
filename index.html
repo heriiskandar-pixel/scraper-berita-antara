@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Viewer Berita ANTARA</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    margin: 0;
+    padding: 24px;
+  }
+  h1 { font-size: 20px; margin-bottom: 16px; }
+  .kontrol {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+  select, input {
+    background: #161b22;
+    color: #e6edf3;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  input[type="text"] { flex: 1; min-width: 200px; }
+  #status { color: #8b949e; font-size: 13px; margin-bottom: 12px; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+  }
+  th, td {
+    border: 1px solid #30363d;
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #161b22;
+    cursor: pointer;
+    user-select: none;
+    position: sticky;
+    top: 0;
+  }
+  th:hover { background: #21262d; }
+  tr:nth-child(even) { background: #10151c; }
+  a { color: #58a6ff; }
+  .panah { opacity: 0.5; font-size: 11px; }
+  #tabel-wrap { overflow-x: auto; max-height: 75vh; overflow-y: auto; }
+</style>
+</head>
+<body>
+
+<h1>📰 Viewer Berita ANTARA News</h1>
+
+<div class="kontrol">
+  <label for="pilih-tanggal">Tanggal:</label>
+  <select id="pilih-tanggal"></select>
+  <input type="text" id="cari" placeholder="Cari judul, kategori, dll...">
+</div>
+
+<div id="status">Memuat daftar file...</div>
+<div id="tabel-wrap"></div>
+
+<script>
+let dataAsli = [];      // data mentah dari file excel yang dipilih
+let kolomUrut = null;   // kolom yang sedang dipakai untuk sort
+let arahUrut = 1;       // 1 = naik, -1 = turun
+
+const elPilihTanggal = document.getElementById('pilih-tanggal');
+const elCari = document.getElementById('cari');
+const elStatus = document.getElementById('status');
+const elTabelWrap = document.getElementById('tabel-wrap');
+
+async function muatDaftarFile() {
+  try {
+    const res = await fetch('data/index.json?_=' + Date.now());
+    if (!res.ok) throw new Error('index.json tidak ditemukan');
+    const daftar = await res.json();
+
+    if (daftar.length === 0) {
+      elStatus.textContent = 'Belum ada file berita tersedia.';
+      return;
+    }
+
+    elPilihTanggal.innerHTML = daftar
+      .map(nama => `<option value="${nama}">${nama.replace('berita_antara_', '').replace('.xlsx', '')}</option>`)
+      .join('');
+
+    await muatFileExcel(daftar[0]);
+  } catch (e) {
+    elStatus.textContent = 'Gagal memuat daftar file: ' + e.message;
+  }
+}
+
+async function muatFileExcel(namaFile) {
+  elStatus.textContent = 'Memuat ' + namaFile + ' ...';
+  try {
+    const res = await fetch('data/' + namaFile + '?_=' + Date.now());
+    if (!res.ok) throw new Error('File tidak ditemukan (' + res.status + ')');
+    const buffer = await res.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: 'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    dataAsli = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    kolomUrut = null;
+    renderTabel();
+    elStatus.textContent = `${dataAsli.length} berita dari ${namaFile}`;
+  } catch (e) {
+    elStatus.textContent = 'Gagal memuat file: ' + e.message;
+    elTabelWrap.innerHTML = '';
+  }
+}
+
+function renderTabel() {
+  let data = [...dataAsli];
+
+  // Filter berdasarkan kotak pencarian (cek semua kolom)
+  const kataKunci = elCari.value.trim().toLowerCase();
+  if (kataKunci) {
+    data = data.filter(baris =>
+      Object.values(baris).some(v => String(v).toLowerCase().includes(kataKunci))
+    );
+  }
+
+  // Sort kalau ada kolom yang dipilih
+  if (kolomUrut) {
+    data.sort((a, b) => {
+      const va = String(a[kolomUrut] ?? '');
+      const vb = String(b[kolomUrut] ?? '');
+      return va.localeCompare(vb, 'id') * arahUrut;
+    });
+  }
+
+  if (data.length === 0) {
+    elTabelWrap.innerHTML = '<p style="color:#8b949e">Tidak ada data yang cocok.</p>';
+    return;
+  }
+
+  const kolom = Object.keys(dataAsli[0]);
+
+  let html = '<table><thead><tr>';
+  for (const k of kolom) {
+    let panah = '';
+    if (kolomUrut === k) panah = arahUrut === 1 ? ' ▲' : ' ▼';
+    html += `<th data-kolom="${k}">${k}<span class="panah">${panah}</span></th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const baris of data) {
+    html += '<tr>';
+    for (const k of kolom) {
+      let nilai = baris[k];
+      if (k === 'Link' && nilai) {
+        html += `<td><a href="${nilai}" target="_blank" rel="noopener">buka</a></td>`;
+      } else {
+        html += `<td>${String(nilai ?? '')}</td>`;
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  elTabelWrap.innerHTML = html;
+
+  // Pasang event klik untuk sort di tiap header
+  elTabelWrap.querySelectorAll('th').forEach(th => {
+    th.addEventListener('click', () => {
+      const k = th.dataset.kolom;
+      if (kolomUrut === k) {
+        arahUrut *= -1;
+      } else {
+        kolomUrut = k;
+        arahUrut = 1;
+      }
+      renderTabel();
+    });
+  });
+}
+
+elPilihTanggal.addEventListener('change', () => muatFileExcel(elPilihTanggal.value));
+elCari.addEventListener('input', renderTabel);
+
+muatDaftarFile();
+</script>
+
+</body>
+</html>
