@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Viewer Berita ANTARA</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -15,6 +16,7 @@
     padding: 24px;
   }
   h1 { font-size: 20px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin: 0 0 10px; color: #c9d1d9; }
   .kontrol {
     display: flex;
     gap: 12px;
@@ -31,7 +33,25 @@
     font-size: 14px;
   }
   input[type="text"] { flex: 1; min-width: 200px; }
-  #status { color: #8b949e; font-size: 13px; margin-bottom: 12px; }
+  #status { color: #8b949e; font-size: 13px; margin-bottom: 20px; }
+
+  .grafik-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 800px) {
+    .grafik-grid { grid-template-columns: 1fr; }
+  }
+  .kartu-grafik {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .kartu-grafik canvas { max-height: 280px; }
+
   table {
     border-collapse: collapse;
     width: 100%;
@@ -67,6 +87,17 @@
 
 <h1>📰 Viewer Berita ANTARA News</h1>
 
+<div class="grafik-grid">
+  <div class="kartu-grafik">
+    <h2>Jumlah Berita per Hari</h2>
+    <canvas id="grafik-per-hari"></canvas>
+  </div>
+  <div class="kartu-grafik">
+    <h2>Jumlah Berita per Kategori <span style="color:#8b949e; font-weight:normal;">(tanggal yang sedang dipilih)</span></h2>
+    <canvas id="grafik-per-kategori"></canvas>
+  </div>
+</div>
+
 <div class="kontrol">
   <label for="pilih-tanggal">Tanggal:</label>
   <select id="pilih-tanggal"></select>
@@ -80,17 +111,21 @@
 let dataAsli = [];      // data mentah dari file excel yang dipilih
 let kolomUrut = null;   // kolom yang sedang dipakai untuk sort
 let arahUrut = 1;       // 1 = naik, -1 = turun
+let chartHari = null;
+let chartKategori = null;
 
 const elPilihTanggal = document.getElementById('pilih-tanggal');
 const elCari = document.getElementById('cari');
 const elStatus = document.getElementById('status');
 const elTabelWrap = document.getElementById('tabel-wrap');
 
+const OPSI_WARNA = ['#58a6ff', '#3fb950', '#f0883e', '#db61a2', '#a371f7', '#e3b341', '#79c0ff', '#56d364'];
+
 async function muatDaftarFile() {
   try {
     const res = await fetch('data/index.json?_=' + Date.now());
     if (!res.ok) throw new Error('index.json tidak ditemukan');
-    const daftar = await res.json();
+    const daftar = await res.json();  // [{file, tanggal, jumlah}, ...]
 
     if (daftar.length === 0) {
       elStatus.textContent = 'Belum ada file berita tersedia.';
@@ -98,13 +133,81 @@ async function muatDaftarFile() {
     }
 
     elPilihTanggal.innerHTML = daftar
-      .map(nama => `<option value="${nama}">${nama.replace('berita_antara_', '').replace('.xlsx', '')}</option>`)
+      .map(d => `<option value="${d.file}">${d.tanggal}</option>`)
       .join('');
 
-    await muatFileExcel(daftar[0]);
+    renderGrafikPerHari(daftar);
+    await muatFileExcel(daftar[0].file);
   } catch (e) {
     elStatus.textContent = 'Gagal memuat daftar file: ' + e.message;
   }
+}
+
+function renderGrafikPerHari(daftar) {
+  // Urutkan dari tanggal terlama ke terbaru supaya grafik enak dibaca kiri->kanan
+  const terurut = [...daftar].sort((a, b) => a.tanggal.localeCompare(b.tanggal));
+  const ctx = document.getElementById('grafik-per-hari');
+
+  if (chartHari) chartHari.destroy();
+  chartHari = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: terurut.map(d => d.tanggal),
+      datasets: [{
+        label: 'Jumlah berita',
+        data: terurut.map(d => d.jumlah ?? 0),
+        backgroundColor: '#58a6ff',
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } },
+        y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function renderGrafikPerKategori(data) {
+  // Kolom 'Kategori' isinya bisa gabungan beberapa nama, dipisah koma (mis. "ekonomi, terkini")
+  const hitung = {};
+  for (const baris of data) {
+    const kategoriMentah = String(baris['Kategori'] ?? '').trim();
+    if (!kategoriMentah) continue;
+    const daftarKategori = kategoriMentah.split(',').map(s => s.trim()).filter(Boolean);
+    for (const k of daftarKategori) {
+      hitung[k] = (hitung[k] || 0) + 1;
+    }
+  }
+
+  const entri = Object.entries(hitung).sort((a, b) => b[1] - a[1]);
+  const ctx = document.getElementById('grafik-per-kategori');
+
+  if (chartKategori) chartKategori.destroy();
+  chartKategori = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: entri.map(e => e[0]),
+      datasets: [{
+        label: 'Jumlah berita',
+        data: entri.map(e => e[1]),
+        backgroundColor: entri.map((_, i) => OPSI_WARNA[i % OPSI_WARNA.length]),
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' }, beginAtZero: true },
+        y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } }
+      }
+    }
+  });
 }
 
 async function muatFileExcel(namaFile) {
@@ -118,6 +221,7 @@ async function muatFileExcel(namaFile) {
     dataAsli = XLSX.utils.sheet_to_json(sheet, { defval: '' });
     kolomUrut = null;
     renderTabel();
+    renderGrafikPerKategori(dataAsli);
     elStatus.textContent = `${dataAsli.length} berita dari ${namaFile}`;
   } catch (e) {
     elStatus.textContent = 'Gagal memuat file: ' + e.message;
