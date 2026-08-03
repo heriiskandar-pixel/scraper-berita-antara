@@ -272,6 +272,17 @@ def main():
         simpan_excel(gabungan, path_output)
         print(f"- {tanggal_file}: {len(gabungan)} berita -> {path_output}")
 
+    # Buat daftar semua file Excel yang ada di folder output (index.json),
+    # dipakai oleh halaman web viewer (index.html) supaya tahu file apa saja
+    # yang tersedia untuk ditampilkan.
+    import json
+    daftar_file = sorted(
+        [f for f in os.listdir(OUTPUT_FOLDER) if f.endswith(".xlsx")],
+        reverse=True,
+    )
+    with open(os.path.join(OUTPUT_FOLDER, "index.json"), "w", encoding="utf-8") as f:
+        json.dump(daftar_file, f, ensure_ascii=False, indent=2)
+
     print("\nSelesai!")
 
 
