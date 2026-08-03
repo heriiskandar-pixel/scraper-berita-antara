@@ -1,9 +1,37 @@
 [
-  "berita_antara_2026-08-03.xlsx",
-  "berita_antara_2026-08-02.xlsx",
-  "berita_antara_2026-08-01.xlsx",
-  "berita_antara_2026-07-31.xlsx",
-  "berita_antara_2026-07-30.xlsx",
-  "berita_antara_2026-07-29.xlsx",
-  "berita_antara_2026-07-28.xlsx"
+  {
+    "file": "berita_antara_2026-08-03.xlsx",
+    "tanggal": "2026-08-03",
+    "jumlah": 194
+  },
+  {
+    "file": "berita_antara_2026-08-02.xlsx",
+    "tanggal": "2026-08-02",
+    "jumlah": 37
+  },
+  {
+    "file": "berita_antara_2026-08-01.xlsx",
+    "tanggal": "2026-08-01",
+    "jumlah": 21
+  },
+  {
+    "file": "berita_antara_2026-07-31.xlsx",
+    "tanggal": "2026-07-31",
+    "jumlah": 26
+  },
+  {
+    "file": "berita_antara_2026-07-30.xlsx",
+    "tanggal": "2026-07-30",
+    "jumlah": 10
+  },
+  {
+    "file": "berita_antara_2026-07-29.xlsx",
+    "tanggal": "2026-07-29",
+    "jumlah": 15
+  },
+  {
+    "file": "berita_antara_2026-07-28.xlsx",
+    "tanggal": "2026-07-28",
+    "jumlah": 10
+  }
 ]
