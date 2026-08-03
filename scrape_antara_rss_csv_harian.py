@@ -273,15 +273,29 @@ def main():
         print(f"- {tanggal_file}: {len(gabungan)} berita -> {path_output}")
 
     # Buat daftar semua file Excel yang ada di folder output (index.json),
-    # dipakai oleh halaman web viewer (index.html) supaya tahu file apa saja
-    # yang tersedia untuk ditampilkan.
+    # lengkap dengan tanggal dan jumlah berita di tiap file -- dipakai oleh
+    # halaman web viewer (index.html) untuk menampilkan tabel & grafik tanpa
+    # harus download semua file Excel satu-satu.
     import json
-    daftar_file = sorted(
-        [f for f in os.listdir(OUTPUT_FOLDER) if f.endswith(".xlsx")],
-        reverse=True,
-    )
+    from openpyxl import load_workbook
+
+    daftar = []
+    for f in os.listdir(OUTPUT_FOLDER):
+        if not f.endswith(".xlsx"):
+            continue
+        tanggal = f.replace(f"{FILENAME_PREFIX}_", "").replace(".xlsx", "")
+        try:
+            wb = load_workbook(os.path.join(OUTPUT_FOLDER, f), read_only=True)
+            ws = wb["Berita"]
+            jumlah = max(ws.max_row - 1, 0)  # dikurangi 1 baris header
+            wb.close()
+        except Exception:
+            jumlah = None
+        daftar.append({"file": f, "tanggal": tanggal, "jumlah": jumlah})
+
+    daftar.sort(key=lambda x: x["tanggal"], reverse=True)
     with open(os.path.join(OUTPUT_FOLDER, "index.json"), "w", encoding="utf-8") as f:
-        json.dump(daftar_file, f, ensure_ascii=False, indent=2)
+        json.dump(daftar, f, ensure_ascii=False, indent=2)
 
     print("\nSelesai!")
 
