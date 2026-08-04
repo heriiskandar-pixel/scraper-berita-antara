@@ -50,6 +50,226 @@ from xml.etree import ElementTree as ET
 import pandas as pd
 import requests
 
+import requests
+from bs4 import BeautifulSoup
+import re
+from datetime import datetime
+import time
+
+# ----------------------------------------------------------------------
+# FUNGSI SCRAPING LANGSUNG UNTUK DETIK.COM
+# ----------------------------------------------------------------------
+def ambil_detik(max_artikel=20):
+    """
+    Ambil berita dari halaman utama Detik.com (https://www.detik.com/)
+    Kembalikan list of dict dengan format:
+    {'Kategori': 'detikcom', 'Judul': ..., 'Tanggal Terbit': ..., ...}
+    """
+    url = "https://www.detik.com/"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=15)
+        resp.raise_for_status()
+    except Exception as e:
+        print(f"  Gagal ambil Detik: {e}")
+        return []
+
+    soup = BeautifulSoup(resp.text, 'lxml')
+    hasil = []
+
+    # Cari artikel – biasanya di dalam <article> atau <div class="media__text">
+    # Detik menggunakan struktur: <article> ... <h2> <a> judul </a> ... </article>
+    # Kita coba beberapa selector umum
+    articles = soup.find_all('article') or soup.find_all('div', class_=re.compile(r'media__text|box_article|list-berita'))
+
+    if not articles:
+        # fallback: cari semua link dengan gambar besar
+        articles = soup.find_all('a', href=re.compile(r'/berita/|/news/|/detik/'))
+
+    for el in articles[:max_artikel]:
+        try:
+            # Judul – cari h2 atau h3 di dalam elemen
+            judul_tag = el.find(['h2', 'h3', 'h4']) or el.find('a', class_=re.compile(r'title|judul'))
+            if not judul_tag:
+                # coba cari a dengan teks panjang
+                a_tag = el.find('a', href=True)
+                if a_tag and len(a_tag.get_text(strip=True)) > 20:
+                    judul = a_tag.get_text(strip=True)
+                    link = a_tag['href']
+                else:
+                    continue
+            else:
+                judul = judul_tag.get_text(strip=True)
+                link_tag = judul_tag.find('a') or el.find('a', href=True)
+                link = link_tag['href'] if link_tag else ''
+                if not link:
+                    link = el.get('href', '')
+
+            # Link absolut
+            if link.startswith('/'):
+                link = 'https://www.detik.com' + link
+            elif not link.startswith('http'):
+                continue
+
+            # Tanggal – cari <time> atau meta
+            tanggal = ''
+            time_tag = el.find('time') or el.find('span', class_=re.compile(r'time|date'))
+            if time_tag:
+                tanggal = time_tag.get_text(strip=True)
+            # jika tidak ada, coba dari meta
+            if not tanggal:
+                meta_date = el.find('meta', {'name': 'pubdate'}) or el.find('meta', {'property': 'article:published_time'})
+                if meta_date and meta_date.get('content'):
+                    tanggal = meta_date['content']
+
+            # Penulis – jarang di halaman utama, kosongkan saja
+            penulis = ''
+
+            # Ringkasan – cari deskripsi
+            ringkasan = ''
+            desc = el.find('p', class_=re.compile(r'desc|summary')) or el.find('div', class_=re.compile(r'summary'))
+            if desc:
+                ringkasan = desc.get_text(strip=True)
+            if not ringkasan:
+                # ambil teks setelah judul
+                teks = el.get_text(separator=' ', strip=True)
+                if judul and judul in teks:
+                    potongan = teks.replace(judul, '').strip()
+                    if len(potongan) > 30:
+                        ringkasan = potongan[:200]
+
+            # Gambar
+            gambar = ''
+            img = el.find('img')
+            if img and img.get('src'):
+                gambar = img['src']
+                if gambar.startswith('//'):
+                    gambar = 'https:' + gambar
+
+            # Kategori tetap 'detikcom'
+            hasil.append({
+                "Kategori": "detikcom",
+                "Judul": judul,
+                "Tanggal Terbit": tanggal,
+                "Penulis": penulis,
+                "Ringkasan": ringkasan,
+                "Link": link,
+                "URL Gambar": gambar
+            })
+        except Exception as e:
+            continue
+
+    # Tambahan: ambil dari sub-domain news.detik.com jika kurang
+    if len(hasil) < 10:
+        try:
+            news_url = "https://news.detik.com/"
+            resp2 = requests.get(news_url, headers=headers, timeout=10)
+            soup2 = BeautifulSoup(resp2.text, 'lxml')
+            for el in soup2.find_all('article')[:10]:
+                # parse sama seperti di atas, tapi kita lewati karena duplikasi kode
+                pass
+        except:
+            pass
+
+    return hasil
+
+# ----------------------------------------------------------------------
+# FUNGSI SCRAPING LANGSUNG UNTUK KOMPAS.COM
+# ----------------------------------------------------------------------
+def ambil_kompas(max_artikel=20):
+    """
+    Ambil berita dari halaman utama Kompas.com (https://www.kompas.com/)
+    """
+    url = "https://www.kompas.com/"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=15)
+        resp.raise_for_status()
+    except Exception as e:
+        print(f"  Gagal ambil Kompas: {e}")
+        return []
+
+    soup = BeautifulSoup(resp.text, 'lxml')
+    hasil = []
+
+    # Kompas menggunakan <div class="article__list"> atau <div class="article__title">
+    articles = soup.find_all('div', class_=re.compile(r'article__list|article__title|article__grid'))
+
+    if not articles:
+        # fallback: cari semua a dengan gambar
+        articles = soup.find_all('a', href=re.compile(r'/read/'))
+
+    for el in articles[:max_artikel]:
+        try:
+            # Judul
+            judul_tag = el.find(['h2', 'h3', 'h4']) or el.find('a', class_=re.compile(r'title'))
+            if not judul_tag:
+                a_tag = el.find('a', href=True)
+                if a_tag and len(a_tag.get_text(strip=True)) > 20:
+                    judul = a_tag.get_text(strip=True)
+                    link = a_tag['href']
+                else:
+                    continue
+            else:
+                judul = judul_tag.get_text(strip=True)
+                link_tag = judul_tag.find('a') or el.find('a', href=True)
+                link = link_tag['href'] if link_tag else ''
+
+            if not link:
+                continue
+            if link.startswith('/'):
+                link = 'https://www.kompas.com' + link
+
+            # Tanggal
+            tanggal = ''
+            time_tag = el.find('time') or el.find('span', class_=re.compile(r'date|time'))
+            if time_tag:
+                tanggal = time_tag.get_text(strip=True)
+            if not tanggal:
+                meta = el.find('meta', {'name': 'pubdate'}) or el.find('meta', {'property': 'article:published_time'})
+                if meta and meta.get('content'):
+                    tanggal = meta['content']
+
+            # Penulis
+            penulis = ''
+            penulis_tag = el.find('span', class_=re.compile(r'author|penulis'))
+            if penulis_tag:
+                penulis = penulis_tag.get_text(strip=True)
+
+            # Ringkasan
+            ringkasan = ''
+            desc = el.find('p', class_=re.compile(r'desc|excerpt')) or el.find('div', class_=re.compile(r'excerpt|summary'))
+            if desc:
+                ringkasan = desc.get_text(strip=True)
+            if not ringkasan:
+                teks = el.get_text(separator=' ', strip=True)
+                if judul and judul in teks:
+                    potongan = teks.replace(judul, '').strip()
+                    if len(potongan) > 30:
+                        ringkasan = potongan[:200]
+
+            # Gambar
+            gambar = ''
+            img = el.find('img')
+            if img and img.get('src'):
+                gambar = img['src']
+                if gambar.startswith('//'):
+                    gambar = 'https:' + gambar
+
+            hasil.append({
+                "Kategori": "kompascom",
+                "Judul": judul,
+                "Tanggal Terbit": tanggal,
+                "Penulis": penulis,
+                "Ringkasan": ringkasan,
+                "Link": link,
+                "URL Gambar": gambar
+            })
+        except:
+            continue
+
+    return hasil
+
 # ----------------------------------------------------------------------
 # 1) DAFTAR KANAL RSS ANTARA NEWS
 #    (kalau mau ambil sebagian saja, edit/hapus baris di bawah)
@@ -207,6 +427,20 @@ def main():
             print(f"GAGAL ({e})")
         time.sleep(0.5)  # jeda sopan antar-request, jangan dihapus
 
+# --- Tambahan scraping Detik & Kompas ---
+print("\n- Mengambil Detik.com via scraping ...", end=" ")
+detik_berita = ambil_detik(max_artikel=30)
+print(f"{len(detik_berita)} berita")
+semua_berita.extend(detik_berita)
+time.sleep(1)
+
+print("- Mengambil Kompas.com via scraping ...", end=" ")
+kompas_berita = ambil_kompas(max_artikel=30)
+print(f"{len(kompas_berita)} berita")
+semua_berita.extend(kompas_berita)
+time.sleep(1)
+
+   
     if not semua_berita:
         print("\nTidak ada berita yang berhasil diambil. Cek koneksi internet Anda.")
         return
