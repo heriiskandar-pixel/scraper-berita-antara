@@ -55,15 +55,15 @@ from bs4 import BeautifulSoup
 import re
 from datetime import datetime
 import time
-
+from dateutil import parser  # <-- tambahkan ini
+from datetime import datetime, timedelta  # <-- pastikan timedelta ada
+import re
 # ----------------------------------------------------------------------
 # FUNGSI SCRAPING LANGSUNG UNTUK DETIK.COM
 # ----------------------------------------------------------------------
-def ambil_detik(max_artikel=20):
+def ambil_detik(max_artikel=30):
     """
-    Ambil berita dari halaman utama Detik.com (https://www.detik.com/)
-    Kembalikan list of dict dengan format:
-    {'Kategori': 'detikcom', 'Judul': ..., 'Tanggal Terbit': ..., ...}
+    Ambil berita dari halaman utama Detik.com, ekstrak kategori dari URL atau breadcrumb.
     """
     url = "https://www.detik.com/"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -77,21 +77,15 @@ def ambil_detik(max_artikel=20):
     soup = BeautifulSoup(resp.text, 'lxml')
     hasil = []
 
-    # Cari artikel – biasanya di dalam <article> atau <div class="media__text">
-    # Detik menggunakan struktur: <article> ... <h2> <a> judul </a> ... </article>
-    # Kita coba beberapa selector umum
     articles = soup.find_all('article') or soup.find_all('div', class_=re.compile(r'media__text|box_article|list-berita'))
-
     if not articles:
-        # fallback: cari semua link dengan gambar besar
         articles = soup.find_all('a', href=re.compile(r'/berita/|/news/|/detik/'))
 
     for el in articles[:max_artikel]:
         try:
-            # Judul – cari h2 atau h3 di dalam elemen
+            # ---- Ambil Judul dan Link ----
             judul_tag = el.find(['h2', 'h3', 'h4']) or el.find('a', class_=re.compile(r'title|judul'))
             if not judul_tag:
-                # coba cari a dengan teks panjang
                 a_tag = el.find('a', href=True)
                 if a_tag and len(a_tag.get_text(strip=True)) > 20:
                     judul = a_tag.get_text(strip=True)
@@ -105,40 +99,52 @@ def ambil_detik(max_artikel=20):
                 if not link:
                     link = el.get('href', '')
 
-            # Link absolut
             if link.startswith('/'):
                 link = 'https://www.detik.com' + link
             elif not link.startswith('http'):
                 continue
 
-            # Tanggal – cari <time> atau meta
+            # ---- Ekstrak KATEGORI dari URL ----
+            # Contoh URL: https://news.detik.com/ekonomi/... atau https://www.detik.com/ekonomi/...
+            kategori = 'umum'
+            # Coba ambil segmen setelah domain
+            path = link.replace('https://', '').replace('http://', '')
+            # Hapus subdomain jika ada (news.detik.com -> detik.com)
+            if path.startswith('news.'):
+                path = path.replace('news.', '')
+            parts = path.split('/')
+            if len(parts) > 1:
+                # Biasanya bagian kedua adalah kategori (setelah domain)
+                possible_kategori = parts[1].lower()
+                if possible_kategori in ['ekonomi', 'politik', 'olahraga', 'sepakbola', 'tekno', 'health', 'lifestyle', 'dunia', 'metro', 'humaniora', 'hiburan', 'otomotif', 'bisnis', 'finansial', 'bursa']:
+                    kategori = possible_kategori
+
+            # ---- Tanggal ----
             tanggal = ''
             time_tag = el.find('time') or el.find('span', class_=re.compile(r'time|date'))
             if time_tag:
                 tanggal = time_tag.get_text(strip=True)
-            # jika tidak ada, coba dari meta
             if not tanggal:
                 meta_date = el.find('meta', {'name': 'pubdate'}) or el.find('meta', {'property': 'article:published_time'})
                 if meta_date and meta_date.get('content'):
                     tanggal = meta_date['content']
 
-            # Penulis – jarang di halaman utama, kosongkan saja
+            # ---- Penulis ----
             penulis = ''
 
-            # Ringkasan – cari deskripsi
+            # ---- Ringkasan ----
             ringkasan = ''
             desc = el.find('p', class_=re.compile(r'desc|summary')) or el.find('div', class_=re.compile(r'summary'))
             if desc:
                 ringkasan = desc.get_text(strip=True)
             if not ringkasan:
-                # ambil teks setelah judul
                 teks = el.get_text(separator=' ', strip=True)
                 if judul and judul in teks:
                     potongan = teks.replace(judul, '').strip()
                     if len(potongan) > 30:
                         ringkasan = potongan[:200]
 
-            # Gambar
+            # ---- Gambar ----
             gambar = ''
             img = el.find('img')
             if img and img.get('src'):
@@ -146,39 +152,27 @@ def ambil_detik(max_artikel=20):
                 if gambar.startswith('//'):
                     gambar = 'https:' + gambar
 
-            # Kategori tetap 'detikcom'
             hasil.append({
-                "Kategori": "detikcom",
+                "Kategori": kategori,        # <-- sekarang berisi topik
                 "Judul": judul,
                 "Tanggal Terbit": tanggal,
                 "Penulis": penulis,
                 "Ringkasan": ringkasan,
                 "Link": link,
-                "URL Gambar": gambar
+                "URL Gambar": gambar,
+                "Media": "detikcom"          # <-- sumber
             })
         except Exception as e:
             continue
-
-    # Tambahan: ambil dari sub-domain news.detik.com jika kurang
-    if len(hasil) < 10:
-        try:
-            news_url = "https://news.detik.com/"
-            resp2 = requests.get(news_url, headers=headers, timeout=10)
-            soup2 = BeautifulSoup(resp2.text, 'lxml')
-            for el in soup2.find_all('article')[:10]:
-                # parse sama seperti di atas, tapi kita lewati karena duplikasi kode
-                pass
-        except:
-            pass
 
     return hasil
 
 # ----------------------------------------------------------------------
 # FUNGSI SCRAPING LANGSUNG UNTUK KOMPAS.COM
 # ----------------------------------------------------------------------
-def ambil_kompas(max_artikel=20):
+def ambil_kompas(max_artikel=30):
     """
-    Ambil berita dari halaman utama Kompas.com (https://www.kompas.com/)
+    Ambil berita dari Kompas.com, ekstrak kategori dari URL atau breadcrumb.
     """
     url = "https://www.kompas.com/"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -192,16 +186,13 @@ def ambil_kompas(max_artikel=20):
     soup = BeautifulSoup(resp.text, 'lxml')
     hasil = []
 
-    # Kompas menggunakan <div class="article__list"> atau <div class="article__title">
     articles = soup.find_all('div', class_=re.compile(r'article__list|article__title|article__grid'))
-
     if not articles:
-        # fallback: cari semua a dengan gambar
         articles = soup.find_all('a', href=re.compile(r'/read/'))
 
     for el in articles[:max_artikel]:
         try:
-            # Judul
+            # ---- Judul & Link ----
             judul_tag = el.find(['h2', 'h3', 'h4']) or el.find('a', class_=re.compile(r'title'))
             if not judul_tag:
                 a_tag = el.find('a', href=True)
@@ -220,7 +211,20 @@ def ambil_kompas(max_artikel=20):
             if link.startswith('/'):
                 link = 'https://www.kompas.com' + link
 
-            # Tanggal
+            # ---- Ekstrak KATEGORI dari URL ----
+            # Contoh: https://www.kompas.com/ekonomi/...
+            kategori = 'umum'
+            path = link.replace('https://', '').replace('http://', '')
+            # Hapus subdomain www.
+            if path.startswith('www.'):
+                path = path.replace('www.', '')
+            parts = path.split('/')
+            if len(parts) > 1:
+                possible = parts[1].lower()
+                if possible in ['ekonomi', 'politik', 'olahraga', 'sepakbola', 'tekno', 'health', 'lifestyle', 'dunia', 'metro', 'humaniora', 'hiburan', 'otomotif', 'bisnis', 'finansial', 'bursa', 'internasional', 'nasional']:
+                    kategori = possible
+
+            # ---- Tanggal ----
             tanggal = ''
             time_tag = el.find('time') or el.find('span', class_=re.compile(r'date|time'))
             if time_tag:
@@ -230,13 +234,13 @@ def ambil_kompas(max_artikel=20):
                 if meta and meta.get('content'):
                     tanggal = meta['content']
 
-            # Penulis
+            # ---- Penulis ----
             penulis = ''
             penulis_tag = el.find('span', class_=re.compile(r'author|penulis'))
             if penulis_tag:
                 penulis = penulis_tag.get_text(strip=True)
 
-            # Ringkasan
+            # ---- Ringkasan ----
             ringkasan = ''
             desc = el.find('p', class_=re.compile(r'desc|excerpt')) or el.find('div', class_=re.compile(r'excerpt|summary'))
             if desc:
@@ -248,7 +252,7 @@ def ambil_kompas(max_artikel=20):
                     if len(potongan) > 30:
                         ringkasan = potongan[:200]
 
-            # Gambar
+            # ---- Gambar ----
             gambar = ''
             img = el.find('img')
             if img and img.get('src'):
@@ -257,15 +261,16 @@ def ambil_kompas(max_artikel=20):
                     gambar = 'https:' + gambar
 
             hasil.append({
-                "Kategori": "kompascom",
+                "Kategori": kategori,
                 "Judul": judul,
                 "Tanggal Terbit": tanggal,
                 "Penulis": penulis,
                 "Ringkasan": ringkasan,
                 "Link": link,
-                "URL Gambar": gambar
+                "URL Gambar": gambar,
+                "Media": "kompascom"
             })
-        except:
+        except Exception as e:
             continue
 
     return hasil
@@ -324,18 +329,93 @@ def clean_html(raw_html: str) -> str:
     return unescape(text).strip()
 
 
-def parse_tanggal(raw: str):
-    """Ubah format tanggal RSS (mis. 'Thu, 28 May 2026 13:27:46 +0700') jadi objek datetime.
-    Kalau gagal dibaca, kembalikan None."""
+def parse_tanggal_umum(raw):
+    """
+    Parse berbagai format tanggal:
+    - Format RSS standar (GMT, WIB)
+    - Format Indonesia (Senin, 28 Mei 2026)
+    - Format RELATIF (misal: '2 jam lalu', '5 hari yang lalu')
+    """
     if not raw:
         return None
-    for fmt in ("%a, %d %b %Y %H:%M:%S %z", "%a, %d %b %Y %H:%M:%S %Z"):
-        try:
-            return datetime.strptime(raw, fmt)
-        except ValueError:
-            continue
-    return None
+    
+    raw = str(raw).strip()
+    raw_lower = raw.lower()
 
+    # =============================================
+    # 1. DETEKSI TANGGAL RELATIF BAHASA INDONESIA
+    # =============================================
+    # Pola: angka + satuan waktu + (yang lalu / lalu)
+    # Contoh: "2 jam yang lalu", "5 hari lalu", "1 minggu lalu"
+    pola = re.compile(r'(\d+)\s*(menit|jam|hari|minggu|bulan|tahun)\s*(yang lalu|lalu)?')
+    cocok = pola.search(raw_lower)
+    
+    if cocok:
+        jumlah = int(cocok.group(1))
+        satuan = cocok.group(2)
+        
+        # Waktu sekarang (dengan timezone, sesuai dengan logika di main)
+        now = datetime.now().astimezone()
+        
+        # Konversi satuan ke timedelta
+        if satuan == 'menit':
+            delta = timedelta(minutes=jumlah)
+        elif satuan == 'jam':
+            delta = timedelta(hours=jumlah)
+        elif satuan == 'hari':
+            delta = timedelta(days=jumlah)
+        elif satuan == 'minggu':
+            delta = timedelta(weeks=jumlah)
+        elif satuan == 'bulan':
+            # Pendekatan: 1 bulan = 30 hari (cukup akurat untuk kebutuhan ini)
+            delta = timedelta(days=jumlah * 30)
+        elif satuan == 'tahun':
+            # Pendekatan: 1 tahun = 365 hari
+            delta = timedelta(days=jumlah * 365)
+        else:
+            delta = None
+        
+        if delta:
+            # Kurangi waktu sekarang dengan delta
+            hasil = now - delta
+            return hasil
+
+    # =============================================
+    # 2. FORMAT LAINNYA (RSS, INDONESIA, DLL)
+    # =============================================
+    
+    # Coba dengan dateutil (paling fleksibel)
+    try:
+        from dateutil import parser
+        return parser.parse(raw, fuzzy=True)
+    except:
+        pass
+
+    # Ganti nama bulan Indonesia ke Inggris (untuk format "Senin, 28 Mei 2026")
+    bulan_ind = {
+        'Jan': 'Jan', 'Feb': 'Feb', 'Mar': 'Mar', 'Apr': 'Apr',
+        'Mei': 'May', 'Jun': 'Jun', 'Jul': 'Jul', 'Agu': 'Aug',
+        'Sep': 'Sep', 'Okt': 'Oct', 'Nov': 'Nov', 'Des': 'Dec'
+    }
+    raw_english = raw
+    for id, en in bulan_ind.items():
+        raw_english = raw_english.replace(id, en)
+
+    # Coba format RSS standar: "Thu, 28 May 2026 13:27:46 +0700"
+    try:
+        return datetime.strptime(raw_english, "%a, %d %b %Y %H:%M:%S %z")
+    except:
+        pass
+
+    # Coba format lain
+    for fmt in ("%d %b %Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(raw_english, fmt)
+        except:
+            continue
+
+    # Kalau semua gagal, kembalikan None (berita akan dibuang)
+    return None
 
 def ambil_satu_feed(nama_feed: str, url_feed: str) -> list[dict]:
     """Ambil dan parse satu RSS feed. Kembalikan list berita (list of dict)."""
@@ -370,6 +450,7 @@ def ambil_satu_feed(nama_feed: str, url_feed: str) -> list[dict]:
             "Ringkasan": deskripsi or isi_encoded,
             "Link": link,
             "URL Gambar": gambar_url,
+           "Media": "antara"
         })
     return hasil
 
@@ -450,7 +531,7 @@ def main():
 
     # Parse tanggal terbit -> objek datetime. Kalau gagal dibaca, DIBUANG
     # (bukan disimpan sembarangan) supaya tidak ada file dengan tanggal salah.
-    df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(parse_tanggal)
+    df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(parse_tanggal_umum)
     jumlah_sebelum = len(df)
     df = df[df["_tanggal_parsed"].notna()].reset_index(drop=True)
     jumlah_tanggal_gagal = jumlah_sebelum - len(df)
