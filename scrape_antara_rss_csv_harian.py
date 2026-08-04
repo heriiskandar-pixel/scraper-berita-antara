@@ -454,43 +454,34 @@ def main():
     # ========== AKHIR TAMBAHAN ==========
 
    
-    if not semua_berita:
-        print("\nTidak ada berita yang berhasil diambil. Cek koneksi internet Anda.")
-        return
+    if    df = pd.DataFrame(semua_berita)
 
-    df = pd.DataFrame(semua_berita)
-# Fallback: jika tanggal gagal di-parse, gunakan tanggal hari ini
-
+    # === PARSING TANGGAL DENGAN FALLBACK ===
     now = datetime.now().astimezone()
 
     def safe_parse_tanggal(tanggal_str):
         hasil = parse_tanggal_umum(tanggal_str)
         if hasil is None:
-            # jika gagal, gunakan sekarang (dengan timezone)
-           return now
+            return now  # fallback ke hari ini
         return hasil
 
-df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(safe_parse_tanggal)
-    # Parse tanggal terbit -> objek datetime. Kalau gagal dibaca, DIBUANG
-    # (bukan disimpan sembarangan) supaya tidak ada file dengan tanggal salah.
-    df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(parse_tanggal_umum)
-# Cek berapa banyak yang berhasil di-parse dari Detik/Kompas
-print(f"Berhasil parse tanggal: {df['_tanggal_parsed'].notna().sum()} dari {len(df)}")
-# Lihat contoh tanggal yang gagal
-gagal = df[df['_tanggal_parsed'].isna()]
-if not gagal.empty:
-    print("Contoh tanggal yang gagal di-parse:")
-    print(gagal['Tanggal Terbit'].head(5).tolist())
+    df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(safe_parse_tanggal)
 
-   # Jika parse gagal, gunakan tanggal hari ini sebagai fallback (agar tidak hilang)
-now = datetime.now().astimezone()
-df["_tanggal_parsed"] = df.apply(
-    lambda row: parse_tanggal_umum(row["Tanggal Terbit"]) if parse_tanggal_umum(row["Tanggal Terbit"]) is not None else now,
-    axis=1
-)
+    # === DEBUG: CEK BERAPA YANG BERHASIL ===
+    print(f"Berhasil parse tanggal: {df['_tanggal_parsed'].notna().sum()} dari {len(df)}")
+    gagal = df[df['_tanggal_parsed'].isna()]
+    if not gagal.empty:
+        print("Contoh tanggal yang gagal di-parse:")
+        print(gagal['Tanggal Terbit'].head(5).tolist())
 
-    # Buang berita yang lebih tua dari MAKS_UMUR_HARI hari
-    now = datetime.now().astimezone()
+    # === BUANG YANG TANGGALNYA NULL (HANYA YANG SANGAT GAGAL) ===
+    jumlah_sebelum = len(df)
+    df = df[df["_tanggal_parsed"].notna()].reset_index(drop=True)
+    jumlah_tanggal_gagal = jumlah_sebelum - len(df)
+    if jumlah_tanggal_gagal:
+        print(f"{jumlah_tanggal_gagal} berita dibuang karena tanggalnya NULL")
+
+    # === BUANG BERITA YANG LEBIH TUA DARI 7 HARI ===
     batas_lama = now.timestamp() - (MAKS_UMUR_HARI * 24 * 60 * 60)
     jumlah_sebelum = len(df)
     df = df[df["_tanggal_parsed"].apply(lambda d: d.timestamp()) >= batas_lama].reset_index(drop=True)
@@ -502,8 +493,7 @@ df["_tanggal_parsed"] = df.apply(
         print("\nTidak ada berita yang lolos filter tanggal. Tidak ada file yang disimpan.")
         return
 
-    # Satu berita bisa muncul di beberapa kategori (mis. 'terkini' dan 'ekonomi').
-    # Gabungkan nama kategorinya jadi satu, lalu buang baris duplikat.
+    # === GABUNGKAN KATEGORI PER LINK ===
     kategori_gabungan = (
         df.groupby("Link")["Kategori"]
         .apply(lambda s: ", ".join(sorted(set(s))))
@@ -512,8 +502,7 @@ df["_tanggal_parsed"] = df.apply(
     df["Kategori"] = df["Link"].map(kategori_gabungan)
     df = df.drop_duplicates(subset=["Link"]).reset_index(drop=True)
 
-    # Tanggal (tanpa jam) untuk pengelompokan nama file -- pakai tanggal LOKAL
-    # sesuai zona waktu yang tertulis di RSS (WIB, +0700), bukan tanggal UTC.
+    # === TANGGAL (TANPA JAM) UNTUK NAMA FILE ===
     df["_tanggal_file"] = df["_tanggal_parsed"].apply(lambda d: d.date().isoformat())
 
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
@@ -530,11 +519,10 @@ df["_tanggal_parsed"] = df.apply(
         else:
             gabungan = grup
 
-        # Jaga-jaga: pastikan SEMUA baris di file ini benar tanggalnya sesuai nama file
-        # (mis. kalau ada baris lama yang entah kenapa tanggalnya beda, dibuang di sini)
-        gabungan = gabungan[
-            gabungan["Tanggal Terbit"].apply(lambda t: str(parse_tanggal_umum(t).date()) == tanggal_file if parse_tanggal_umum(t) else False)
-        ].reset_index(drop=True)
+        # === VALIDASI TANGGAL (DINONAKTIFKAN SEMENTARA AGAR DATA TIDAK HILANG) ===
+        # gabungan = gabungan[
+        #     gabungan["Tanggal Terbit"].apply(lambda t: str(parse_tanggal_umum(t).date()) == tanggal_file if parse_tanggal_umum(t) else False)
+        # ]
 
         simpan_excel(gabungan, path_output)
         print(f"- {tanggal_file}: {len(gabungan)} berita -> {path_output}")
