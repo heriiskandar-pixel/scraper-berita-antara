@@ -427,18 +427,19 @@ def main():
             print(f"GAGAL ({e})")
         time.sleep(0.5)  # jeda sopan antar-request, jangan dihapus
 
-# --- Tambahan scraping Detik & Kompas ---
-print("\n- Mengambil Detik.com via scraping ...", end=" ")
-detik_berita = ambil_detik(max_artikel=30)
-print(f"{len(detik_berita)} berita")
-semua_berita.extend(detik_berita)
-time.sleep(1)
+# ========== TAMBAHAN SCRAPING DETIK & KOMPAS ==========
+    print("\n- Mengambil Detik.com via scraping ...", end=" ")
+    detik_berita = ambil_detik(max_artikel=30)
+    print(f"{len(detik_berita)} berita")
+    semua_berita.extend(detik_berita)
+    time.sleep(1)
 
-print("- Mengambil Kompas.com via scraping ...", end=" ")
-kompas_berita = ambil_kompas(max_artikel=30)
-print(f"{len(kompas_berita)} berita")
-semua_berita.extend(kompas_berita)
-time.sleep(1)
+    print("- Mengambil Kompas.com via scraping ...", end=" ")
+    kompas_berita = ambil_kompas(max_artikel=30)
+    print(f"{len(kompas_berita)} berita")
+    semua_berita.extend(kompas_berita)
+    time.sleep(1)
+    # ========== AKHIR TAMBAHAN ==========
 
    
     if not semua_berita:
