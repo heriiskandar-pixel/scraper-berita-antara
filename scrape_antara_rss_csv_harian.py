@@ -62,9 +62,6 @@ import re
 # FUNGSI SCRAPING LANGSUNG UNTUK DETIK.COM
 # ----------------------------------------------------------------------
 def ambil_detik(max_artikel=30):
-    """
-    Ambil berita dari Detik.com dengan fallback tanggal hari ini jika parse gagal.
-    """
     url = "https://www.detik.com/"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     try:
@@ -78,7 +75,6 @@ def ambil_detik(max_artikel=30):
     hasil = []
     debug_count = 0
 
-    # Cari semua link yang mengarah ke artikel Detik
     links = soup.find_all('a', href=re.compile(r'/(berita|news|detik)/\d+'))
     
     for a in links[:max_artikel * 2]:
@@ -95,7 +91,6 @@ def ambil_detik(max_artikel=30):
             if len(judul) < 20:
                 continue
 
-            # Ekstrak kategori dari URL
             kategori = 'umum'
             path = link.replace('https://', '').replace('http://', '')
             if path.startswith('news.'):
@@ -106,7 +101,6 @@ def ambil_detik(max_artikel=30):
                 if possible in ['ekonomi', 'politik', 'olahraga', 'sepakbola', 'tekno', 'health', 'lifestyle', 'dunia', 'metro', 'humaniora', 'hiburan', 'otomotif', 'bisnis', 'finansial', 'bursa']:
                     kategori = possible
 
-            # Tanggal
             tanggal = ''
             parent = a.parent
             time_tag = parent.find('time') if parent else None
@@ -118,7 +112,6 @@ def ambil_detik(max_artikel=30):
                     if tanggal:
                         break
 
-            # Debug: cetak 3 contoh tanggal pertama
             if debug_count < 3:
                 print(f"  [DEBUG Detik] Contoh tanggal: '{tanggal}'")
                 debug_count += 1
@@ -127,16 +120,15 @@ def ambil_detik(max_artikel=30):
                 "Kategori": kategori,
                 "Judul": judul,
                 "Tanggal Terbit": tanggal,
-                "Penulis": '',
-                "Ringkasan': '',
+                "Penulis": "",
+                "Ringkasan": "",
                 "Link": link,
-                "URL Gambar": '',
+                "URL Gambar": "",
                 "Media": "detikcom"
             })
             if len(hasil) >= max_artikel:
                 break
         except Exception:
-            # Lewati jika ada error parsing satu artikel
             continue
 
     return hasil
@@ -144,9 +136,6 @@ def ambil_detik(max_artikel=30):
 # FUNGSI SCRAPING LANGSUNG UNTUK KOMPAS.COM
 # ----------------------------------------------------------------------
 def ambil_kompas(max_artikel=30):
-    """
-    Ambil berita dari Kompas.com dengan fallback tanggal hari ini jika parse gagal.
-    """
     url = "https://www.kompas.com/"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     try:
@@ -160,7 +149,6 @@ def ambil_kompas(max_artikel=30):
     hasil = []
     debug_count = 0
 
-    # Cari semua link yang mengarah ke artikel Kompas
     links = soup.find_all('a', href=re.compile(r'/read/\d+'))
     
     for a in links[:max_artikel * 2]:
@@ -177,7 +165,6 @@ def ambil_kompas(max_artikel=30):
             if len(judul) < 20:
                 continue
 
-            # Ekstrak kategori dari URL
             kategori = 'umum'
             path = link.replace('https://', '').replace('http://', '')
             if path.startswith('www.'):
@@ -188,20 +175,17 @@ def ambil_kompas(max_artikel=30):
                 if possible in ['ekonomi', 'politik', 'olahraga', 'sepakbola', 'tekno', 'health', 'lifestyle', 'dunia', 'metro', 'humaniora', 'hiburan', 'otomotif', 'bisnis', 'finansial', 'bursa', 'internasional', 'nasional']:
                     kategori = possible
 
-            # Tanggal
             tanggal = ''
             parent = a.parent
             time_tag = parent.find('time') if parent else None
             if time_tag:
                 tanggal = time_tag.get_text(strip=True)
             if not tanggal:
-                # cari elemen dengan class date/time
                 for sibling in parent.find_all(['span', 'div'], class_=re.compile(r'date|time')):
                     tanggal = sibling.get_text(strip=True)
                     if tanggal:
                         break
 
-            # Debug: cetak 3 contoh tanggal pertama
             if debug_count < 3:
                 print(f"  [DEBUG Kompas] Contoh tanggal: '{tanggal}'")
                 debug_count += 1
@@ -210,10 +194,10 @@ def ambil_kompas(max_artikel=30):
                 "Kategori": kategori,
                 "Judul": judul,
                 "Tanggal Terbit": tanggal,
-                "Penulis": '',
-                "Ringkasan": '',
+                "Penulis": "",
+                "Ringkasan": "",
                 "Link": link,
-                "URL Gambar": '',
+                "URL Gambar": "",
                 "Media": "kompascom"
             })
             if len(hasil) >= max_artikel:
@@ -476,7 +460,7 @@ def main():
 
     df = pd.DataFrame(semua_berita)
 # Fallback: jika tanggal gagal di-parse, gunakan tanggal hari ini
-from datetime import datetime, timedelta  # pastikan sudah di-import
+
 now = datetime.now().astimezone()
 
 def safe_parse_tanggal(tanggal_str):
