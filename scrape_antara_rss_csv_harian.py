@@ -128,7 +128,9 @@ def ambil_detik(max_artikel=30):
                 meta_date = el.find('meta', {'name': 'pubdate'}) or el.find('meta', {'property': 'article:published_time'})
                 if meta_date and meta_date.get('content'):
                     tanggal = meta_date['content']
-
+# Di dalam loop, setelah dapat tanggal:
+if len(hasil) < 3:  # cetak 3 contoh pertama
+    print(f"  [DEBUG] Contoh tanggal Detik: '{tanggal}'")
             # ---- Penulis ----
             penulis = ''
 
@@ -233,7 +235,9 @@ def ambil_kompas(max_artikel=30):
                 meta = el.find('meta', {'name': 'pubdate'}) or el.find('meta', {'property': 'article:published_time'})
                 if meta and meta.get('content'):
                     tanggal = meta['content']
-
+# Di dalam loop, setelah dapat tanggal:
+if len(hasil) < 3:  # cetak 3 contoh pertama
+    print(f"  [DEBUG] Contoh tanggal Kompas: '{tanggal}'")
             # ---- Penulis ----
             penulis = ''
             penulis_tag = el.find('span', class_=re.compile(r'author|penulis'))
@@ -532,11 +536,20 @@ def main():
     # Parse tanggal terbit -> objek datetime. Kalau gagal dibaca, DIBUANG
     # (bukan disimpan sembarangan) supaya tidak ada file dengan tanggal salah.
     df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(parse_tanggal_umum)
-    jumlah_sebelum = len(df)
-    df = df[df["_tanggal_parsed"].notna()].reset_index(drop=True)
-    jumlah_tanggal_gagal = jumlah_sebelum - len(df)
-    if jumlah_tanggal_gagal:
-        print(f"\n{jumlah_tanggal_gagal} berita dibuang karena tanggal terbitnya gagal dibaca")
+# Cek berapa banyak yang berhasil di-parse dari Detik/Kompas
+print(f"Berhasil parse tanggal: {df['_tanggal_parsed'].notna().sum()} dari {len(df)}")
+# Lihat contoh tanggal yang gagal
+gagal = df[df['_tanggal_parsed'].isna()]
+if not gagal.empty:
+    print("Contoh tanggal yang gagal di-parse:")
+    print(gagal['Tanggal Terbit'].head(5).tolist())
+
+   # Jika parse gagal, gunakan tanggal hari ini sebagai fallback (agar tidak hilang)
+now = datetime.now().astimezone()
+df["_tanggal_parsed"] = df.apply(
+    lambda row: parse_tanggal_umum(row["Tanggal Terbit"]) if parse_tanggal_umum(row["Tanggal Terbit"]) is not None else now,
+    axis=1
+)
 
     # Buang berita yang lebih tua dari MAKS_UMUR_HARI hari
     now = datetime.now().astimezone()
