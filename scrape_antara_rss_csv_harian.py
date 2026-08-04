@@ -437,9 +437,9 @@ def main():
             semua_berita.extend(berita)
         except Exception as e:
             print(f"GAGAL ({e})")
-        time.sleep(0.5)  # jeda sopan antar-request, jangan dihapus
+        time.sleep(0.5)
 
-# ========== TAMBAHAN SCRAPING DETIK & KOMPAS ==========
+    # ========== TAMBAHAN SCRAPING DETIK & KOMPAS ==========
     print("\n- Mengambil Detik.com via scraping ...", end=" ")
     detik_berita = ambil_detik(max_artikel=30)
     print(f"{len(detik_berita)} berita")
@@ -451,10 +451,12 @@ def main():
     print(f"{len(kompas_berita)} berita")
     semua_berita.extend(kompas_berita)
     time.sleep(1)
-    # ========== AKHIR TAMBAHAN ==========
 
-   
-    if    df = pd.DataFrame(semua_berita)
+    if not semua_berita:
+        print("\nTidak ada berita yang berhasil diambil. Cek koneksi internet Anda.")
+        return
+
+    df = pd.DataFrame(semua_berita)
 
     # === PARSING TANGGAL DENGAN FALLBACK ===
     now = datetime.now().astimezone()
@@ -462,7 +464,7 @@ def main():
     def safe_parse_tanggal(tanggal_str):
         hasil = parse_tanggal_umum(tanggal_str)
         if hasil is None:
-            return now  # fallback ke hari ini
+            return now
         return hasil
 
     df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(safe_parse_tanggal)
@@ -474,14 +476,14 @@ def main():
         print("Contoh tanggal yang gagal di-parse:")
         print(gagal['Tanggal Terbit'].head(5).tolist())
 
-    # === BUANG YANG TANGGALNYA NULL (HANYA YANG SANGAT GAGAL) ===
+    # === BUANG YANG TANGGALNYA NULL ===
     jumlah_sebelum = len(df)
     df = df[df["_tanggal_parsed"].notna()].reset_index(drop=True)
     jumlah_tanggal_gagal = jumlah_sebelum - len(df)
     if jumlah_tanggal_gagal:
         print(f"{jumlah_tanggal_gagal} berita dibuang karena tanggalnya NULL")
 
-    # === BUANG BERITA YANG LEBIH TUA DARI 7 HARI ===
+    # === BUANG BERITA LEBIH TUA DARI 7 HARI ===
     batas_lama = now.timestamp() - (MAKS_UMUR_HARI * 24 * 60 * 60)
     jumlah_sebelum = len(df)
     df = df[df["_tanggal_parsed"].apply(lambda d: d.timestamp()) >= batas_lama].reset_index(drop=True)
@@ -502,7 +504,7 @@ def main():
     df["Kategori"] = df["Link"].map(kategori_gabungan)
     df = df.drop_duplicates(subset=["Link"]).reset_index(drop=True)
 
-    # === TANGGAL (TANPA JAM) UNTUK NAMA FILE ===
+    # === TANGGAL UNTUK NAMA FILE ===
     df["_tanggal_file"] = df["_tanggal_parsed"].apply(lambda d: d.date().isoformat())
 
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
@@ -519,7 +521,7 @@ def main():
         else:
             gabungan = grup
 
-        # === VALIDASI TANGGAL (DINONAKTIFKAN SEMENTARA AGAR DATA TIDAK HILANG) ===
+        # === VALIDASI TANGGAL DINONAKTIFKAN SEMENTARA ===
         # gabungan = gabungan[
         #     gabungan["Tanggal Terbit"].apply(lambda t: str(parse_tanggal_umum(t).date()) == tanggal_file if parse_tanggal_umum(t) else False)
         # ]
@@ -527,10 +529,7 @@ def main():
         simpan_excel(gabungan, path_output)
         print(f"- {tanggal_file}: {len(gabungan)} berita -> {path_output}")
 
-    # Buat daftar semua file Excel yang ada di folder output (index.json),
-    # lengkap dengan tanggal dan jumlah berita di tiap file -- dipakai oleh
-    # halaman web viewer (index.html) untuk menampilkan tabel & grafik tanpa
-    # harus download semua file Excel satu-satu.
+    # === BUAT INDEX.JSON ===
     import json
     from openpyxl import load_workbook
 
@@ -542,7 +541,7 @@ def main():
         try:
             wb = load_workbook(os.path.join(OUTPUT_FOLDER, f), read_only=True)
             ws = wb["Berita"]
-            jumlah = max(ws.max_row - 1, 0)  # dikurangi 1 baris header
+            jumlah = max(ws.max_row - 1, 0)
             wb.close()
         except Exception:
             jumlah = None
@@ -553,7 +552,6 @@ def main():
         json.dump(daftar, f, ensure_ascii=False, indent=2)
 
     print("\nSelesai!")
-
 
 if __name__ == "__main__":
     main()
