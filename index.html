@@ -15,8 +15,10 @@
     margin: 0;
     padding: 24px;
   }
-  h1 { font-size: 20px; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .sub { color: #8b949e; font-size: 13px; margin-bottom: 16px; }
   h2 { font-size: 15px; margin: 0 0 10px; color: #c9d1d9; }
+
   .kontrol {
     display: flex;
     gap: 12px;
@@ -24,7 +26,7 @@
     margin-bottom: 16px;
     align-items: center;
   }
-  select, input {
+  select, input, button {
     background: #161b22;
     color: #e6edf3;
     border: 1px solid #30363d;
@@ -32,14 +34,47 @@
     padding: 8px 12px;
     font-size: 14px;
   }
+  button {
+    cursor: pointer;
+  }
+  button:hover { background: #21262d; }
   input[type="text"] { flex: 1; min-width: 200px; }
-  #status { color: #8b949e; font-size: 13px; margin-bottom: 20px; }
+
+  #filter-aktif {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    min-height: 28px;
+  }
+  .chip {
+    background: #1f6feb33;
+    border: 1px solid #58a6ff;
+    color: #58a6ff;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .chip button {
+    background: none;
+    border: none;
+    color: #58a6ff;
+    cursor: pointer;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  #status { color: #8b949e; font-size: 13px; margin-bottom: 12px; }
 
   .grafik-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
   }
   @media (max-width: 800px) {
     .grafik-grid { grid-template-columns: 1fr; }
@@ -50,7 +85,8 @@
     border-radius: 8px;
     padding: 16px;
   }
-  .kartu-grafik canvas { max-height: 280px; }
+  .kartu-grafik canvas { max-height: 280px; cursor: pointer; }
+  .petunjuk { color: #6e7681; font-size: 11px; margin-top: 6px; }
 
   table {
     border-collapse: collapse;
@@ -74,7 +110,7 @@
   tr:nth-child(even) { background: #10151c; }
   a { color: #58a6ff; }
   .panah { opacity: 0.5; font-size: 11px; }
-  #tabel-wrap { overflow-x: auto; max-height: 75vh; overflow-y: auto; }
+  #tabel-wrap { overflow-x: auto; max-height: 65vh; overflow-y: auto; }
   td img {
     width: 160px;
     height: auto;
@@ -86,15 +122,18 @@
 <body>
 
 <h1>📰 Viewer Berita ANTARA News</h1>
+<div class="sub">Klik salah satu batang di grafik untuk memfilter tabel dan grafik lainnya.</div>
 
 <div class="grafik-grid">
   <div class="kartu-grafik">
     <h2>Jumlah Berita per Hari</h2>
     <canvas id="grafik-per-hari"></canvas>
+    <div class="petunjuk">Klik batang untuk filter ke tanggal itu. Klik lagi untuk batalkan.</div>
   </div>
   <div class="kartu-grafik">
-    <h2>Jumlah Berita per Kategori <span style="color:#8b949e; font-weight:normal;">(tanggal yang sedang dipilih)</span></h2>
+    <h2>Jumlah Berita per Kategori</h2>
     <canvas id="grafik-per-kategori"></canvas>
+    <div class="petunjuk">Klik batang untuk filter ke kategori itu. Klik lagi untuk batalkan.</div>
   </div>
 </div>
 
@@ -102,15 +141,19 @@
   <label for="pilih-tanggal">Tanggal:</label>
   <select id="pilih-tanggal"></select>
   <input type="text" id="cari" placeholder="Cari judul, kategori, dll...">
+  <button id="reset-filter">Reset semua filter</button>
 </div>
 
-<div id="status">Memuat daftar file...</div>
+<div id="filter-aktif"></div>
+<div id="status">Memuat data...</div>
 <div id="tabel-wrap"></div>
 
 <script>
-let dataAsli = [];      // data mentah dari file excel yang dipilih
-let kolomUrut = null;   // kolom yang sedang dipakai untuk sort
-let arahUrut = 1;       // 1 = naik, -1 = turun
+let semuaData = [];        // gabungan semua baris dari semua file, tiap baris punya _tanggalFile
+let filterTanggal = null;  // null = semua tanggal
+let filterKategori = null; // null = semua kategori
+let kolomUrut = null;
+let arahUrut = 1;
 let chartHari = null;
 let chartKategori = null;
 
@@ -118,10 +161,16 @@ const elPilihTanggal = document.getElementById('pilih-tanggal');
 const elCari = document.getElementById('cari');
 const elStatus = document.getElementById('status');
 const elTabelWrap = document.getElementById('tabel-wrap');
+const elFilterAktif = document.getElementById('filter-aktif');
+const elResetFilter = document.getElementById('reset-filter');
 
+const WARNA_NORMAL = '#30363d';
+const WARNA_AKTIF = '#58a6ff';
 const OPSI_WARNA = ['#58a6ff', '#3fb950', '#f0883e', '#db61a2', '#a371f7', '#e3b341', '#79c0ff', '#56d364'];
 
-async function muatDaftarFile() {
+// ---------- MUAT DATA ----------
+
+async function muatSemuaData() {
   try {
     const res = await fetch('data/index.json?_=' + Date.now());
     if (!res.ok) throw new Error('index.json tidak ditemukan');
@@ -132,33 +181,95 @@ async function muatDaftarFile() {
       return;
     }
 
-    elPilihTanggal.innerHTML = daftar
-      .map(d => `<option value="${d.file}">${d.tanggal}</option>`)
-      .join('');
+    elPilihTanggal.innerHTML = '<option value="">Semua tanggal</option>' +
+      daftar.map(d => `<option value="${d.tanggal}">${d.tanggal}</option>`).join('');
 
-    renderGrafikPerHari(daftar);
-    await muatFileExcel(daftar[0].file);
+    elStatus.textContent = `Memuat ${daftar.length} file...`;
+
+    const hasil = await Promise.all(daftar.map(async d => {
+      try {
+        const r = await fetch('data/' + d.file + '?_=' + Date.now());
+        if (!r.ok) return [];
+        const buffer = await r.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const baris = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        return baris.map(b => ({ ...b, _tanggalFile: d.tanggal }));
+      } catch (e) {
+        return [];
+      }
+    }));
+
+    semuaData = hasil.flat();
+    renderSemua();
   } catch (e) {
-    elStatus.textContent = 'Gagal memuat daftar file: ' + e.message;
+    elStatus.textContent = 'Gagal memuat data: ' + e.message;
   }
 }
 
-function renderGrafikPerHari(daftar) {
-  // Urutkan dari tanggal terlama ke terbaru supaya grafik enak dibaca kiri->kanan
-  const terurut = [...daftar].sort((a, b) => a.tanggal.localeCompare(b.tanggal));
-  const ctx = document.getElementById('grafik-per-hari');
+// ---------- FUNGSI FILTER ----------
 
+function cocokPencarian(baris, kataKunci) {
+  if (!kataKunci) return true;
+  return Object.values(baris).some(v => String(v).toLowerCase().includes(kataKunci));
+}
+
+function pecahKategori(baris) {
+  const mentah = String(baris['Kategori'] ?? '').trim();
+  if (!mentah) return [];
+  return mentah.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function dataTersaring() {
+  const kataKunci = elCari.value.trim().toLowerCase();
+  return semuaData.filter(b => {
+    if (!cocokPencarian(b, kataKunci)) return false;
+    if (filterTanggal && b._tanggalFile !== filterTanggal) return false;
+    if (filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
+    return true;
+  });
+}
+
+// Data untuk grafik per-hari: ikut filter kategori & pencarian, TAPI TIDAK ikut filter tanggal
+// (supaya grafik ini tetap menampilkan semua hari sebagai pilihan)
+function dataUntukGrafikHari() {
+  const kataKunci = elCari.value.trim().toLowerCase();
+  return semuaData.filter(b => {
+    if (!cocokPencarian(b, kataKunci)) return false;
+    if (filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
+    return true;
+  });
+}
+
+// Data untuk grafik per-kategori: ikut filter tanggal & pencarian, TAPI TIDAK ikut filter kategori
+function dataUntukGrafikKategori() {
+  const kataKunci = elCari.value.trim().toLowerCase();
+  return semuaData.filter(b => {
+    if (!cocokPencarian(b, kataKunci)) return false;
+    if (filterTanggal && b._tanggalFile !== filterTanggal) return false;
+    return true;
+  });
+}
+
+// ---------- RENDER GRAFIK ----------
+
+function renderGrafikPerHari() {
+  const data = dataUntukGrafikHari();
+  const hitung = {};
+  for (const b of data) {
+    hitung[b._tanggalFile] = (hitung[b._tanggalFile] || 0) + 1;
+  }
+  const label = Object.keys(hitung).sort();
+  const nilai = label.map(l => hitung[l]);
+  const warna = label.map(l => l === filterTanggal ? WARNA_AKTIF : WARNA_NORMAL);
+
+  const ctx = document.getElementById('grafik-per-hari');
   if (chartHari) chartHari.destroy();
   chartHari = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: terurut.map(d => d.tanggal),
-      datasets: [{
-        label: 'Jumlah berita',
-        data: terurut.map(d => d.jumlah ?? 0),
-        backgroundColor: '#58a6ff',
-        borderRadius: 4,
-      }]
+      labels: label,
+      datasets: [{ label: 'Jumlah berita', data: nilai, backgroundColor: warna, borderRadius: 4 }]
     },
     options: {
       responsive: true,
@@ -166,37 +277,41 @@ function renderGrafikPerHari(daftar) {
       scales: {
         x: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } },
         y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' }, beginAtZero: true }
+      },
+      onClick: (evt, elemen) => {
+        if (elemen.length === 0) return;
+        const tanggalDiklik = label[elemen[0].index];
+        filterTanggal = (filterTanggal === tanggalDiklik) ? null : tanggalDiklik;
+        elPilihTanggal.value = filterTanggal || '';
+        renderSemua();
       }
     }
   });
 }
 
-function renderGrafikPerKategori(data) {
-  // Kolom 'Kategori' isinya bisa gabungan beberapa nama, dipisah koma (mis. "ekonomi, terkini")
+function renderGrafikPerKategori() {
+  const data = dataUntukGrafikKategori();
   const hitung = {};
-  for (const baris of data) {
-    const kategoriMentah = String(baris['Kategori'] ?? '').trim();
-    if (!kategoriMentah) continue;
-    const daftarKategori = kategoriMentah.split(',').map(s => s.trim()).filter(Boolean);
-    for (const k of daftarKategori) {
+  for (const b of data) {
+    for (const k of pecahKategori(b)) {
       hitung[k] = (hitung[k] || 0) + 1;
     }
   }
-
   const entri = Object.entries(hitung).sort((a, b) => b[1] - a[1]);
-  const ctx = document.getElementById('grafik-per-kategori');
+  const label = entri.map(e => e[0]);
+  const nilai = entri.map(e => e[1]);
+  const warna = label.map((l, i) => {
+    if (filterKategori) return l === filterKategori ? WARNA_AKTIF : WARNA_NORMAL;
+    return OPSI_WARNA[i % OPSI_WARNA.length];
+  });
 
+  const ctx = document.getElementById('grafik-per-kategori');
   if (chartKategori) chartKategori.destroy();
   chartKategori = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: entri.map(e => e[0]),
-      datasets: [{
-        label: 'Jumlah berita',
-        data: entri.map(e => e[1]),
-        backgroundColor: entri.map((_, i) => OPSI_WARNA[i % OPSI_WARNA.length]),
-        borderRadius: 4,
-      }]
+      labels: label,
+      datasets: [{ label: 'Jumlah berita', data: nilai, backgroundColor: warna, borderRadius: 4 }]
     },
     options: {
       indexAxis: 'y',
@@ -205,42 +320,45 @@ function renderGrafikPerKategori(data) {
       scales: {
         x: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' }, beginAtZero: true },
         y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } }
+      },
+      onClick: (evt, elemen) => {
+        if (elemen.length === 0) return;
+        const kategoriDiklik = label[elemen[0].index];
+        filterKategori = (filterKategori === kategoriDiklik) ? null : kategoriDiklik;
+        renderSemua();
       }
     }
   });
 }
 
-async function muatFileExcel(namaFile) {
-  elStatus.textContent = 'Memuat ' + namaFile + ' ...';
-  try {
-    const res = await fetch('data/' + namaFile + '?_=' + Date.now());
-    if (!res.ok) throw new Error('File tidak ditemukan (' + res.status + ')');
-    const buffer = await res.arrayBuffer();
-    const wb = XLSX.read(buffer, { type: 'array' });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    dataAsli = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-    kolomUrut = null;
-    renderTabel();
-    renderGrafikPerKategori(dataAsli);
-    elStatus.textContent = `${dataAsli.length} berita dari ${namaFile}`;
-  } catch (e) {
-    elStatus.textContent = 'Gagal memuat file: ' + e.message;
-    elTabelWrap.innerHTML = '';
+// ---------- RENDER CHIP FILTER AKTIF ----------
+
+function renderChipFilter() {
+  const chip = [];
+  if (filterTanggal) {
+    chip.push(`<span class="chip">Tanggal: ${filterTanggal} <button onclick="hapusFilterTanggal()">✕</button></span>`);
   }
+  if (filterKategori) {
+    chip.push(`<span class="chip">Kategori: ${filterKategori} <button onclick="hapusFilterKategori()">✕</button></span>`);
+  }
+  elFilterAktif.innerHTML = chip.join('');
 }
 
+function hapusFilterTanggal() {
+  filterTanggal = null;
+  elPilihTanggal.value = '';
+  renderSemua();
+}
+function hapusFilterKategori() {
+  filterKategori = null;
+  renderSemua();
+}
+
+// ---------- RENDER TABEL ----------
+
 function renderTabel() {
-  let data = [...dataAsli];
+  let data = dataTersaring();
 
-  // Filter berdasarkan kotak pencarian (cek semua kolom)
-  const kataKunci = elCari.value.trim().toLowerCase();
-  if (kataKunci) {
-    data = data.filter(baris =>
-      Object.values(baris).some(v => String(v).toLowerCase().includes(kataKunci))
-    );
-  }
-
-  // Sort kalau ada kolom yang dipilih
   if (kolomUrut) {
     data.sort((a, b) => {
       const va = String(a[kolomUrut] ?? '');
@@ -249,12 +367,14 @@ function renderTabel() {
     });
   }
 
+  elStatus.textContent = `${data.length} berita ditampilkan (dari total ${semuaData.length})`;
+
   if (data.length === 0) {
     elTabelWrap.innerHTML = '<p style="color:#8b949e">Tidak ada data yang cocok.</p>';
     return;
   }
 
-  const kolom = Object.keys(dataAsli[0]);
+  const kolom = Object.keys(semuaData[0]).filter(k => k !== '_tanggalFile');
 
   let html = '<table><thead><tr>';
   for (const k of kolom) {
@@ -281,7 +401,6 @@ function renderTabel() {
   html += '</tbody></table>';
   elTabelWrap.innerHTML = html;
 
-  // Pasang event klik untuk sort di tiap header
   elTabelWrap.querySelectorAll('th').forEach(th => {
     th.addEventListener('click', () => {
       const k = th.dataset.kolom;
@@ -296,10 +415,31 @@ function renderTabel() {
   });
 }
 
-elPilihTanggal.addEventListener('change', () => muatFileExcel(elPilihTanggal.value));
-elCari.addEventListener('input', renderTabel);
+// ---------- RENDER SEMUA (dipanggil tiap kali ada perubahan filter) ----------
 
-muatDaftarFile();
+function renderSemua() {
+  renderChipFilter();
+  renderGrafikPerHari();
+  renderGrafikPerKategori();
+  renderTabel();
+}
+
+// ---------- EVENT ----------
+
+elPilihTanggal.addEventListener('change', () => {
+  filterTanggal = elPilihTanggal.value || null;
+  renderSemua();
+});
+elCari.addEventListener('input', renderSemua);
+elResetFilter.addEventListener('click', () => {
+  filterTanggal = null;
+  filterKategori = null;
+  elPilihTanggal.value = '';
+  elCari.value = '';
+  renderSemua();
+});
+
+muatSemuaData();
 </script>
 
 </body>
