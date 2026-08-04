@@ -63,7 +63,7 @@ import re
 # ----------------------------------------------------------------------
 def ambil_detik(max_artikel=30):
     """
-    Ambil berita dari halaman utama Detik.com, ekstrak kategori dari URL atau breadcrumb.
+    Ambil berita dari Detik.com dengan fallback tanggal hari ini jika parse gagal.
     """
     url = "https://www.detik.com/"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -76,105 +76,76 @@ def ambil_detik(max_artikel=30):
 
     soup = BeautifulSoup(resp.text, 'lxml')
     hasil = []
+    debug_count = 0
 
-    articles = soup.find_all('article') or soup.find_all('div', class_=re.compile(r'media__text|box_article|list-berita'))
-    if not articles:
-        articles = soup.find_all('a', href=re.compile(r'/berita/|/news/|/detik/'))
-
-    for el in articles[:max_artikel]:
+    # Cari semua link yang mengarah ke artikel Detik
+    links = soup.find_all('a', href=re.compile(r'/(berita|news|detik)/\d+'))
+    
+    for a in links[:max_artikel * 2]:
         try:
-            # ---- Ambil Judul dan Link ----
-            judul_tag = el.find(['h2', 'h3', 'h4']) or el.find('a', class_=re.compile(r'title|judul'))
-            if not judul_tag:
-                a_tag = el.find('a', href=True)
-                if a_tag and len(a_tag.get_text(strip=True)) > 20:
-                    judul = a_tag.get_text(strip=True)
-                    link = a_tag['href']
-                else:
-                    continue
-            else:
-                judul = judul_tag.get_text(strip=True)
-                link_tag = judul_tag.find('a') or el.find('a', href=True)
-                link = link_tag['href'] if link_tag else ''
-                if not link:
-                    link = el.get('href', '')
-
+            link = a.get('href')
+            if not link:
+                continue
             if link.startswith('/'):
                 link = 'https://www.detik.com' + link
             elif not link.startswith('http'):
                 continue
 
-            # ---- Ekstrak KATEGORI dari URL ----
-            # Contoh URL: https://news.detik.com/ekonomi/... atau https://www.detik.com/ekonomi/...
+            judul = a.get_text(strip=True)
+            if len(judul) < 20:
+                continue
+
+            # Ekstrak kategori dari URL
             kategori = 'umum'
-            # Coba ambil segmen setelah domain
             path = link.replace('https://', '').replace('http://', '')
-            # Hapus subdomain jika ada (news.detik.com -> detik.com)
             if path.startswith('news.'):
                 path = path.replace('news.', '')
             parts = path.split('/')
             if len(parts) > 1:
-                # Biasanya bagian kedua adalah kategori (setelah domain)
-                possible_kategori = parts[1].lower()
-                if possible_kategori in ['ekonomi', 'politik', 'olahraga', 'sepakbola', 'tekno', 'health', 'lifestyle', 'dunia', 'metro', 'humaniora', 'hiburan', 'otomotif', 'bisnis', 'finansial', 'bursa']:
-                    kategori = possible_kategori
+                possible = parts[1].lower()
+                if possible in ['ekonomi', 'politik', 'olahraga', 'sepakbola', 'tekno', 'health', 'lifestyle', 'dunia', 'metro', 'humaniora', 'hiburan', 'otomotif', 'bisnis', 'finansial', 'bursa']:
+                    kategori = possible
 
-            # ---- Tanggal ----
+            # Tanggal
             tanggal = ''
-            time_tag = el.find('time') or el.find('span', class_=re.compile(r'time|date'))
+            parent = a.parent
+            time_tag = parent.find('time') if parent else None
             if time_tag:
                 tanggal = time_tag.get_text(strip=True)
             if not tanggal:
-                meta_date = el.find('meta', {'name': 'pubdate'}) or el.find('meta', {'property': 'article:published_time'})
-                if meta_date and meta_date.get('content'):
-                    tanggal = meta_date['content']
-# Di dalam loop, setelah dapat tanggal:
-if len(hasil) < 3:  # cetak 3 contoh pertama
-    print(f"  [DEBUG] Contoh tanggal Detik: '{tanggal}'")
-            # ---- Penulis ----
-            penulis = ''
+                for sibling in parent.find_all(['span', 'div'], class_=re.compile(r'time|date')):
+                    tanggal = sibling.get_text(strip=True)
+                    if tanggal:
+                        break
 
-            # ---- Ringkasan ----
-            ringkasan = ''
-            desc = el.find('p', class_=re.compile(r'desc|summary')) or el.find('div', class_=re.compile(r'summary'))
-            if desc:
-                ringkasan = desc.get_text(strip=True)
-            if not ringkasan:
-                teks = el.get_text(separator=' ', strip=True)
-                if judul and judul in teks:
-                    potongan = teks.replace(judul, '').strip()
-                    if len(potongan) > 30:
-                        ringkasan = potongan[:200]
-
-            # ---- Gambar ----
-            gambar = ''
-            img = el.find('img')
-            if img and img.get('src'):
-                gambar = img['src']
-                if gambar.startswith('//'):
-                    gambar = 'https:' + gambar
+            # Debug: cetak 3 contoh tanggal pertama
+            if debug_count < 3:
+                print(f"  [DEBUG Detik] Contoh tanggal: '{tanggal}'")
+                debug_count += 1
 
             hasil.append({
-                "Kategori": kategori,        # <-- sekarang berisi topik
+                "Kategori": kategori,
                 "Judul": judul,
                 "Tanggal Terbit": tanggal,
-                "Penulis": penulis,
-                "Ringkasan": ringkasan,
+                "Penulis": '',
+                "Ringkasan': '',
                 "Link": link,
-                "URL Gambar": gambar,
-                "Media": "detikcom"          # <-- sumber
+                "URL Gambar": '',
+                "Media": "detikcom"
             })
-        except Exception as e:
+            if len(hasil) >= max_artikel:
+                break
+        except Exception:
+            # Lewati jika ada error parsing satu artikel
             continue
 
     return hasil
-
 # ----------------------------------------------------------------------
 # FUNGSI SCRAPING LANGSUNG UNTUK KOMPAS.COM
 # ----------------------------------------------------------------------
 def ambil_kompas(max_artikel=30):
     """
-    Ambil berita dari Kompas.com, ekstrak kategori dari URL atau breadcrumb.
+    Ambil berita dari Kompas.com dengan fallback tanggal hari ini jika parse gagal.
     """
     url = "https://www.kompas.com/"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -187,37 +158,28 @@ def ambil_kompas(max_artikel=30):
 
     soup = BeautifulSoup(resp.text, 'lxml')
     hasil = []
+    debug_count = 0
 
-    articles = soup.find_all('div', class_=re.compile(r'article__list|article__title|article__grid'))
-    if not articles:
-        articles = soup.find_all('a', href=re.compile(r'/read/'))
-
-    for el in articles[:max_artikel]:
+    # Cari semua link yang mengarah ke artikel Kompas
+    links = soup.find_all('a', href=re.compile(r'/read/\d+'))
+    
+    for a in links[:max_artikel * 2]:
         try:
-            # ---- Judul & Link ----
-            judul_tag = el.find(['h2', 'h3', 'h4']) or el.find('a', class_=re.compile(r'title'))
-            if not judul_tag:
-                a_tag = el.find('a', href=True)
-                if a_tag and len(a_tag.get_text(strip=True)) > 20:
-                    judul = a_tag.get_text(strip=True)
-                    link = a_tag['href']
-                else:
-                    continue
-            else:
-                judul = judul_tag.get_text(strip=True)
-                link_tag = judul_tag.find('a') or el.find('a', href=True)
-                link = link_tag['href'] if link_tag else ''
-
+            link = a.get('href')
             if not link:
                 continue
             if link.startswith('/'):
                 link = 'https://www.kompas.com' + link
+            elif not link.startswith('http'):
+                continue
 
-            # ---- Ekstrak KATEGORI dari URL ----
-            # Contoh: https://www.kompas.com/ekonomi/...
+            judul = a.get_text(strip=True)
+            if len(judul) < 20:
+                continue
+
+            # Ekstrak kategori dari URL
             kategori = 'umum'
             path = link.replace('https://', '').replace('http://', '')
-            # Hapus subdomain www.
             if path.startswith('www.'):
                 path = path.replace('www.', '')
             parts = path.split('/')
@@ -226,59 +188,40 @@ def ambil_kompas(max_artikel=30):
                 if possible in ['ekonomi', 'politik', 'olahraga', 'sepakbola', 'tekno', 'health', 'lifestyle', 'dunia', 'metro', 'humaniora', 'hiburan', 'otomotif', 'bisnis', 'finansial', 'bursa', 'internasional', 'nasional']:
                     kategori = possible
 
-            # ---- Tanggal ----
+            # Tanggal
             tanggal = ''
-            time_tag = el.find('time') or el.find('span', class_=re.compile(r'date|time'))
+            parent = a.parent
+            time_tag = parent.find('time') if parent else None
             if time_tag:
                 tanggal = time_tag.get_text(strip=True)
             if not tanggal:
-                meta = el.find('meta', {'name': 'pubdate'}) or el.find('meta', {'property': 'article:published_time'})
-                if meta and meta.get('content'):
-                    tanggal = meta['content']
-# Di dalam loop, setelah dapat tanggal:
-if len(hasil) < 3:  # cetak 3 contoh pertama
-    print(f"  [DEBUG] Contoh tanggal Kompas: '{tanggal}'")
-            # ---- Penulis ----
-            penulis = ''
-            penulis_tag = el.find('span', class_=re.compile(r'author|penulis'))
-            if penulis_tag:
-                penulis = penulis_tag.get_text(strip=True)
+                # cari elemen dengan class date/time
+                for sibling in parent.find_all(['span', 'div'], class_=re.compile(r'date|time')):
+                    tanggal = sibling.get_text(strip=True)
+                    if tanggal:
+                        break
 
-            # ---- Ringkasan ----
-            ringkasan = ''
-            desc = el.find('p', class_=re.compile(r'desc|excerpt')) or el.find('div', class_=re.compile(r'excerpt|summary'))
-            if desc:
-                ringkasan = desc.get_text(strip=True)
-            if not ringkasan:
-                teks = el.get_text(separator=' ', strip=True)
-                if judul and judul in teks:
-                    potongan = teks.replace(judul, '').strip()
-                    if len(potongan) > 30:
-                        ringkasan = potongan[:200]
-
-            # ---- Gambar ----
-            gambar = ''
-            img = el.find('img')
-            if img and img.get('src'):
-                gambar = img['src']
-                if gambar.startswith('//'):
-                    gambar = 'https:' + gambar
+            # Debug: cetak 3 contoh tanggal pertama
+            if debug_count < 3:
+                print(f"  [DEBUG Kompas] Contoh tanggal: '{tanggal}'")
+                debug_count += 1
 
             hasil.append({
                 "Kategori": kategori,
                 "Judul": judul,
                 "Tanggal Terbit": tanggal,
-                "Penulis": penulis,
-                "Ringkasan": ringkasan,
+                "Penulis": '',
+                "Ringkasan": '',
                 "Link": link,
-                "URL Gambar": gambar,
+                "URL Gambar": '',
                 "Media": "kompascom"
             })
-        except Exception as e:
+            if len(hasil) >= max_artikel:
+                break
+        except Exception:
             continue
 
     return hasil
-
 # ----------------------------------------------------------------------
 # 1) DAFTAR KANAL RSS ANTARA NEWS
 #    (kalau mau ambil sebagian saja, edit/hapus baris di bawah)
@@ -532,7 +475,18 @@ def main():
         return
 
     df = pd.DataFrame(semua_berita)
+# Fallback: jika tanggal gagal di-parse, gunakan tanggal hari ini
+from datetime import datetime, timedelta  # pastikan sudah di-import
+now = datetime.now().astimezone()
 
+def safe_parse_tanggal(tanggal_str):
+    hasil = parse_tanggal_umum(tanggal_str)
+    if hasil is None:
+        # jika gagal, gunakan sekarang (dengan timezone)
+        return now
+    return hasil
+
+df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(safe_parse_tanggal)
     # Parse tanggal terbit -> objek datetime. Kalau gagal dibaca, DIBUANG
     # (bukan disimpan sembarangan) supaya tidak ada file dengan tanggal salah.
     df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(parse_tanggal_umum)
