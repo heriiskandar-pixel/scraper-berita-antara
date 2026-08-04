@@ -461,14 +461,14 @@ def main():
     df = pd.DataFrame(semua_berita)
 # Fallback: jika tanggal gagal di-parse, gunakan tanggal hari ini
 
-now = datetime.now().astimezone()
+    now = datetime.now().astimezone()
 
-def safe_parse_tanggal(tanggal_str):
-    hasil = parse_tanggal_umum(tanggal_str)
-    if hasil is None:
-        # jika gagal, gunakan sekarang (dengan timezone)
-        return now
-    return hasil
+    def safe_parse_tanggal(tanggal_str):
+        hasil = parse_tanggal_umum(tanggal_str)
+        if hasil is None:
+            # jika gagal, gunakan sekarang (dengan timezone)
+           return now
+        return hasil
 
 df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(safe_parse_tanggal)
     # Parse tanggal terbit -> objek datetime. Kalau gagal dibaca, DIBUANG
