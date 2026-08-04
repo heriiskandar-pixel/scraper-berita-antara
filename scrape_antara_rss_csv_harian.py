@@ -582,7 +582,7 @@ def main():
         # Jaga-jaga: pastikan SEMUA baris di file ini benar tanggalnya sesuai nama file
         # (mis. kalau ada baris lama yang entah kenapa tanggalnya beda, dibuang di sini)
         gabungan = gabungan[
-            gabungan["Tanggal Terbit"].apply(lambda t: str(parse_tanggal(t).date()) == tanggal_file if parse_tanggal(t) else False)
+            gabungan["Tanggal Terbit"].apply(lambda t: str(parse_tanggal_umum(t).date()) == tanggal_file if parse_tanggal_umum(t) else False)
         ].reset_index(drop=True)
 
         simpan_excel(gabungan, path_output)
