@@ -64,7 +64,6 @@ import re
 def ambil_detik(max_artikel=30):
     headers = {"User-Agent": "Mozilla/5.0"}
     hasil = []
-
     urls = ["https://www.detik.com/", "https://news.detik.com/", "https://www.detik.com/terpopuler"]
 
     for url in urls:
@@ -79,7 +78,7 @@ def ambil_detik(max_artikel=30):
 
         soup = BeautifulSoup(resp.text, 'lxml')
         link_candidates = soup.find_all('a', href=re.compile(r'/\d+/'))
-        
+
         for a in link_candidates[:max_artikel * 3]:
             link = a.get('href')
             if not link or not link.startswith("http"):
@@ -115,14 +114,12 @@ def ambil_detik(max_artikel=30):
             if len(hasil) >= max_artikel:
                 break
     return hasil
-
 # ----------------------------------------------------------------------
 # FUNGSI SCRAPING LANGSUNG UNTUK KOMPAS.COM
 # ----------------------------------------------------------------------
 def ambil_kompas(max_artikel=30):
     headers = {"User-Agent": "Mozilla/5.0"}
     hasil = []
-
     urls = ["https://www.kompas.com/", "https://www.kompas.com/terpopuler"]
 
     for url in urls:
