@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard Analisis Berita</title>
+  <title>Dashboard Analisis Media & Berita</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -32,7 +32,7 @@
     const { useState } = React;
     const { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } = Recharts;
 
-    // 1. Komponen Tombol Ekspor Excel (Dinamis Theme)
+    // 1. Tombol Ekspor Excel (Dinamis Theme)
     const ExcelExportButton = ({ theme, onClick }) => {
       const isDark = theme === 'dark';
 
@@ -56,37 +56,7 @@
       );
     };
 
-    // 2. Komponen KPI Cards
-    const KPICards = ({ totalBerita, totalMedia, totalKategori }) => {
-      const cards = [
-        { title: 'Jumlah Berita', value: totalBerita, icon: '📰' },
-        { title: 'Jumlah Media', value: totalMedia, icon: '🌐' },
-        { title: 'Jumlah Kategori', value: totalKategori, icon: '🏷️' },
-      ];
-
-      return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {cards.map((card, idx) => (
-            <div 
-              key={idx} 
-              className="p-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm"
-            >
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  {card.title}
-                </span>
-                <span className="text-2xl">{card.icon}</span>
-              </div>
-              <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                {card.value.toLocaleString('id-ID')}
-              </div>
-            </div>
-          ))}
-        </div>
-      );
-    };
-
-    // 3. Custom Tooltip (Jumlah & Persentase)
+    // 2. Custom Tooltip (Jumlah & Persentase)
     const CustomTooltip = ({ active, payload, label, totalData }) => {
       if (active && payload && payload.length) {
         const value = payload[0].value;
@@ -96,7 +66,7 @@
           <div className="bg-gray-900 text-white p-3 rounded-lg shadow-lg border border-gray-700 text-xs">
             <p className="font-semibold text-gray-300 mb-1">{label}</p>
             <p className="text-emerald-400 font-bold">
-              Jumlah: {value.toLocaleString('id-ID')} berita
+              Jumlah: {value.toLocaleString('id-ID')}
             </p>
             <p className="text-gray-400 mt-0.5">
               Porsi: {percentage}% dari total
@@ -107,7 +77,7 @@
       return null;
     };
 
-    // Komponen Reusable Bar Chart
+    // 3. Komponen Bar Chart Reusable
     const NewsBarChart = ({ title, data, dataKey = "value", categoryKey = "name", color = "#10B981" }) => {
       const totalData = data.reduce((acc, curr) => acc + curr[dataKey], 0);
 
@@ -129,7 +99,7 @@
       );
     };
 
-    // 4. Utama App Component
+    // 4. Main App Component
     const App = () => {
       const [theme, setTheme] = useState('dark');
 
@@ -139,12 +109,25 @@
         document.documentElement.classList.toggle('dark');
       };
 
-      // Dummy Data
+      // Data KPI (Lama + Baru)
+      const kpiList = [
+        // KPI Tambahan Baru
+        { title: 'Jumlah Berita', value: '1,250', icon: '📰' },
+        { title: 'Jumlah Media', value: '48', icon: '🌐' },
+        { title: 'Jumlah Kategori', value: '12', icon: '🏷️' },
+        // KPI Eksisting / Komponen Lama
+        { title: 'Total Jangkauan (Reach)', value: '3.4M', icon: '📈' },
+        { title: 'Sentimen Positif', value: '62%', icon: '😊' },
+        { title: 'Share of Voice', value: '28.5%', icon: '📢' },
+      ];
+
+      // Data Grafik Bar
       const beritaPerHari = [
         { name: '01 Aug', value: 120 },
         { name: '02 Aug', value: 200 },
         { name: '03 Aug', value: 150 },
         { name: '04 Aug', value: 300 },
+        { name: '05 Aug', value: 250 },
       ];
 
       const beritaPerMedia = [
@@ -152,45 +135,66 @@
         { name: 'Kompas', value: 320 },
         { name: 'Tempo', value: 210 },
         { name: 'Antara', value: 180 },
+        { name: 'Kumparan', value: 90 },
       ];
 
       const beritaPerSentimen = [
-        { name: 'Positif', value: 500 },
-        { name: 'Netral', value: 350 },
-        { name: 'Negatif', value: 150 },
+        { name: 'Positif', value: 650 },
+        { name: 'Netral', value: 400 },
+        { name: 'Negatif', value: 200 },
       ];
 
       const beritaPerKategori = [
         { name: 'Politik', value: 400 },
         { name: 'Ekonomi', value: 300 },
-        { name: 'Teknologi', value: 200 },
-        { name: 'Hukum', value: 100 },
+        { name: 'Teknologi', value: 250 },
+        { name: 'Hukum', value: 180 },
+        { name: 'Sosial', value: 120 },
       ];
 
       return (
-        <div className="p-6 max-w-7xl mx-auto">
+        <div className="p-6 max-w-7xl mx-auto space-y-6">
           {/* Header */}
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-wrap justify-between items-center gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Analisis Berita</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Ringkasan statistik media dan sentimen</p>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Monitoring Media</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Analisis sebaran berita, media, dan sentimen publik</p>
             </div>
             
             <div className="flex items-center gap-3">
               <button 
                 onClick={toggleTheme} 
-                className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-xs font-medium"
+                className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-xs font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition"
               >
                 {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
               </button>
-              <ExcelExportButton theme={theme} onClick={() => alert('Mengunduh Excel...')} />
+              
+              {/* Tombol Ekspor Excel Tambahan */}
+              <ExcelExportButton theme={theme} onClick={() => alert('Proses ekspor Excel dimulai...')} />
             </div>
           </div>
 
-          {/* KPI Cards */}
-          <KPICards totalBerita={1000} totalMedia={25} totalKategori={8} />
+          {/* Grid KPI Cards (KPI Lama + KPI Baru) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {kpiList.map((kpi, idx) => (
+              <div 
+                key={idx} 
+                className="p-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm"
+              >
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {kpi.title}
+                  </span>
+                  <span className="text-2xl">{kpi.icon}</span>
+                </div>
+                <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                  {kpi.value}
+                </div>
+              </div>
+            ))}
+          </div>
 
-          {/* 4 Grafik Berita (Bar All) */}
+          {/* Grid Grafik Bar (4 Jenis Grafik) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <NewsBarChart title="Jumlah Berita Per Hari" data={beritaPerHari} color="#3B82F6" />
             <NewsBarChart title="Jumlah Berita Per Media" data={beritaPerMedia} color="#8B5CF6" />
