@@ -4,3 +4,5 @@ openpyxl
 beautifulsoup4
 lxml
 python-dateutil
+torch
+transformers
