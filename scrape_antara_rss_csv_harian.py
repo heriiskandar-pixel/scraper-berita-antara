@@ -2,8 +2,8 @@
 """
 scrape_berita_rss.py
 ====================
-Mengambil berita dari ANTARA News (RSS), Detik.com (RSS), dan Kompas.com (scraping).
-Menyimpan hasil ke file Excel per tanggal terbit dengan Ringkasan & URL Gambar terisi.
+Mengambil berita dari SELURUH RSS ANTARA News, Detik.com (RSS), dan Kompas.com (scraping).
+Menyimpan hasil ke file Excel per tanggal terbit dengan Kategori, Ringkasan & Gambar terisi.
 """
 
 import os
@@ -26,6 +26,35 @@ FILENAME_PREFIX = "berita"
 MAKS_UMUR_HARI = 7
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+
+# ----------------------------------------------------------------------
+# DAFTAR RSS FEEDS (SEMUA RSS ANTARA NEWS)
+# ----------------------------------------------------------------------
+FEEDS = {
+    # --- ANTARA NEWS (SELURUH KANAL) ---
+    "antara-terkini":      {"url": "https://www.antaranews.com/rss/terkini.xml", "media": "Antara", "kategori": "Terkini"},
+    "antara-top-news":     {"url": "https://www.antaranews.com/rss/top-news.xml", "media": "Antara", "kategori": "Top News"},
+    "antara-politik":      {"url": "https://www.antaranews.com/rss/politik.xml", "media": "Antara", "kategori": "Politik"},
+    "antara-hukum":        {"url": "https://www.antaranews.com/rss/hukum.xml", "media": "Antara", "kategori": "Hukum"},
+    "antara-ekonomi":      {"url": "https://www.antaranews.com/rss/ekonomi.xml", "media": "Antara", "kategori": "Ekonomi"},
+    "antara-metro":        {"url": "https://www.antaranews.com/rss/metro.xml", "media": "Antara", "kategori": "Metro"},
+    "antara-sepakbola":    {"url": "https://www.antaranews.com/rss/sepakbola.xml", "media": "Antara", "kategori": "Sepakbola"},
+    "antara-olahraga":     {"url": "https://www.antaranews.com/rss/olahraga.xml", "media": "Antara", "kategori": "Olahraga"},
+    "antara-humaniora":    {"url": "https://www.antaranews.com/rss/humaniora.xml", "media": "Antara", "kategori": "Humaniora"},
+    "antara-lifestyle":    {"url": "https://www.antaranews.com/rss/lifestyle.xml", "media": "Antara", "kategori": "Lifestyle"},
+    "antara-hiburan":      {"url": "https://www.antaranews.com/rss/hiburan.xml", "media": "Antara", "kategori": "Hiburan"},
+    "antara-dunia":        {"url": "https://www.antaranews.com/rss/dunia.xml", "media": "Antara", "kategori": "Dunia"},
+    "antara-infografis":   {"url": "https://www.antaranews.com/rss/infografis.xml", "media": "Antara", "kategori": "Infografis"},
+    "antara-tekno":        {"url": "https://www.antaranews.com/rss/tekno.xml", "media": "Antara", "kategori": "Tekno"},
+    "antara-otomotif":     {"url": "https://www.antaranews.com/rss/otomotif.xml", "media": "Antara", "kategori": "Otomotif"},
+    "antara-warta-bumi":   {"url": "https://www.antaranews.com/rss/warta-bumi.xml", "media": "Antara", "kategori": "Warta Bumi"},
+    "antara-foto":         {"url": "https://www.antaranews.com/rss/foto.xml", "media": "Antara", "kategori": "Foto"},
+
+    # --- DETIK.COM ---
+    "detik-news":          {"url": "https://news.detik.com/rss", "media": "Detik", "kategori": "News"},
+    "detik-finance":       {"url": "https://finance.detik.com/rss", "media": "Detik", "kategori": "Finance"},
+    "detik-sport":         {"url": "https://sport.detik.com/rss", "media": "Detik", "kategori": "Sport"},
 }
 
 # ----------------------------------------------------------------------
@@ -55,16 +84,8 @@ def format_tanggal_rfc2822(dt):
     return dt.strftime("%a, %d %b %Y %H:%M:%S %z")
 
 # ----------------------------------------------------------------------
-# AMBIL RSS ANTARA & DETIK
+# AMBIL RSS
 # ----------------------------------------------------------------------
-FEEDS = {
-    "antara-terkini": {"url": "https://www.antaranews.com/rss/terkini.xml", "media": "Antara", "kategori": "Terkini"},
-    "antara-politik": {"url": "https://www.antaranews.com/rss/politik.xml", "media": "Antara", "kategori": "Politik"},
-    "detik-news":     {"url": "https://news.detik.com/rss", "media": "Detik", "kategori": "News"},
-    "detik-finance":  {"url": "https://finance.detik.com/rss", "media": "Detik", "kategori": "Finance"},
-    "detik-sport":    {"url": "https://sport.detik.com/rss", "media": "Detik", "kategori": "Sport"},
-}
-
 def ambil_rss(feed_info):
     hasil = []
     try:
@@ -72,7 +93,6 @@ def ambil_rss(feed_info):
         resp.raise_for_status()
         root = ET.fromstring(resp.content)
         
-        # Namespace XML untuk menangani tag media:content / media:thumbnail
         namespaces = {
             'media': 'http://search.yahoo.com/mrss/',
             'content': 'http://purl.org/rss/1.0/modules/content/'
@@ -84,8 +104,9 @@ def ambil_rss(feed_info):
             tanggal = (item.findtext("pubDate") or "").strip()
             raw_desc = item.findtext("description") or ""
             
+            # Kategori otomatis dari XML atau fallback ke topik kanal
             cat_xml = item.findtext("category")
-            kategori_berita = cat_xml.strip().capitalize() if cat_xml else feed_info["kategori"]
+            kategori_berita = cat_xml.strip().capitalize() if cat_xml and cat_xml.strip() else feed_info["kategori"]
 
             # --- EKSTRAKSI URL GAMBAR ---
             url_gambar = ""
@@ -101,13 +122,12 @@ def ambil_rss(feed_info):
                 if media_content is not None and media_content.get("url"):
                     url_gambar = media_content.get("url")
 
-            # 3. Ekstrak dari HTML <img> di dalam description
+            # 3. Ekstrak dari HTML <img> di dalam tag description
             if not url_gambar and raw_desc:
                 match_img = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', raw_desc, re.IGNORECASE)
                 if match_img:
                     url_gambar = match_img.group(1)
 
-            # Clean description untuk ringkasan teks
             deskripsi = clean_html(raw_desc)
 
             hasil.append({
@@ -159,7 +179,6 @@ def ambil_kompas(max_artikel=30):
             if len(judul) < 20:
                 continue
 
-            # Tanggal dari URL Kompas
             match_date = re.search(r'/read/(\d{4})/(\d{2})/(\d{2})/', link)
             if match_date:
                 thn, bln, tgl = match_date.groups()
@@ -167,7 +186,6 @@ def ambil_kompas(max_artikel=30):
             else:
                 tanggal = ""
 
-            # Kategori dari domain
             subdomain_match = re.search(r'https://([a-zA-Z0-9-]+)\.kompas\.com', link)
             if subdomain_match:
                 kat = subdomain_match.group(1).capitalize()
@@ -175,7 +193,6 @@ def ambil_kompas(max_artikel=30):
             else:
                 kategori = "General"
 
-            # EKSTRAKSI DETAIL ARTIKEL (RINGKASAN, GAMBAR, PENULIS)
             ringkasan = ""
             url_gambar = ""
             penulis = ""
@@ -184,7 +201,7 @@ def ambil_kompas(max_artikel=30):
                 if art_resp.status_code == 200:
                     art_soup = BeautifulSoup(art_resp.text, 'lxml')
                     
-                    # 1. Ringkasan
+                    # Ringkasan
                     meta_desc = art_soup.find('meta', attrs={'name': 'description'}) or \
                                 art_soup.find('meta', attrs={'property': 'og:description'})
                     if meta_desc and meta_desc.get('content'):
@@ -194,13 +211,13 @@ def ambil_kompas(max_artikel=30):
                         if p_first:
                             ringkasan = p_first.get_text(strip=True)
 
-                    # 2. URL Gambar
+                    # URL Gambar
                     meta_img = art_soup.find('meta', attrs={'property': 'og:image'}) or \
                                art_soup.find('meta', attrs={'name': 'twitter:image'})
                     if meta_img and meta_img.get('content'):
                         url_gambar = meta_img['content'].strip()
 
-                    # 3. Penulis
+                    # Penulis
                     meta_author = art_soup.find('meta', attrs={'name': 'author'})
                     if meta_author and meta_author.get('content'):
                         penulis = meta_author['content'].strip()
@@ -254,7 +271,7 @@ def main():
         berita = ambil_rss(feed_info)
         print(f"{len(berita)} berita")
         semua_berita.extend(berita)
-        time.sleep(0.5)
+        time.sleep(0.3)
 
     print("\n- Mengambil Kompas via scraping ...", end=" ")
     kompas_berita = ambil_kompas(max_artikel=30)
@@ -265,7 +282,10 @@ def main():
         print("Tidak ada berita yang berhasil diambil.")
         return
 
+    # Hapus duplikasi berdasarkan link berita
     df = pd.DataFrame(semua_berita)
+    df.drop_duplicates(subset=["Link"], keep="first", inplace=True)
+
     df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(parse_tanggal)
 
     now = datetime.now(timezone.utc)
@@ -293,7 +313,7 @@ def main():
     with open(os.path.join(OUTPUT_FOLDER, "index.json"), "w", encoding="utf-8") as f:
         json.dump(daftar, f, ensure_ascii=False, indent=2)
 
-    print("\nSelesai!")
+    print("\nSelesai! Seluruh berita dari kanal ANTARA News berhasil disimpan.")
 
 if __name__ == "__main__":
     main()
