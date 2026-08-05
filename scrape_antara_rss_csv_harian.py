@@ -3,11 +3,11 @@
 scrape_berita_rss.py
 ====================
 Skrip otomatisasi penarik berita:
+- Analisis Sentimen berbasis AI (IndoBERT via Hugging Face Transformers).
 - Menarik seluruh RSS Feed ANTARA News (17 Kanal) & RSS Detikcom.
-- Melakukan scraping halaman Indeks Kanal Detikcom hingga Halaman 3 (max_page=3).
-- Melakukan scraping halaman Indeks Kompas.com hingga Halaman 3 (max_page=3).
-- Ekstraksi nama Penulis/Author secara presisi (termasuk fallback Redaksi).
-- Analisis Sentimen Otomatis (Positif, Netral, Negatif).
+- Scraping halaman Indeks Kanal Detikcom hingga Halaman 3.
+- Scraping halaman Indeks Kompas.com hingga Halaman 3.
+- Ekstraksi nama Penulis/Author secara presisi.
 - Menyimpan data kumulatif tanpa duplikat ke Excel per tanggal terbit & index.json.
 """
 
@@ -22,6 +22,7 @@ from html import unescape
 from xml.etree import ElementTree as ET
 from bs4 import BeautifulSoup
 from dateutil import parser
+from transformers import pipeline
 
 # ----------------------------------------------------------------------
 # PENGATURAN GLOBAL
@@ -29,52 +30,57 @@ from dateutil import parser
 OUTPUT_FOLDER = "data"
 FILENAME_PREFIX = "berita"
 MAKS_UMUR_HARI = 7
-MAX_PAGE_INDEKS = 3  # Pengambilan hingga Halaman 3 untuk Indeks Detik & Kompas
+MAX_PAGE_INDEKS = 3
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
 # ----------------------------------------------------------------------
-# KAMUS SENTIMEN BAHASA INDONESIA
+# INISIALISASI MODEL AI SENTIMEN (INDOBERT)
 # ----------------------------------------------------------------------
-KATA_POSITIF = {
-    "tumbuh", "naik", "untung", "sukses", "menang", "mencapai", "rekor", "apresiasi", 
-    "positif", "membaik", "stabil", "bantuan", "resmi", "dukung", "lonjakan", "prestasi", 
-    "puncak", "terbaik", "optimal", "laba", "surplus", "penghargaan", "berhasil", 
-    "kerjasama", "inovasi", "pemulihan", "mendorong", "maju", "bangkit", "sejahtera",
-    "pembangunan", "investasi", "optimis", "meningkat", "sambut", "karya", "juara"
-}
-
-KATA_NEGATIF = {
-    "anjlok", "turun", "rugi", "krisis", "korupsi", "rusak", "tewas", "korban", 
-    "kebakaran", "bencana", "gempa", "kecelakaan", "kasus", "sanksi", "ancam", 
-    "ancaman", "bahaya", "tersangka", "pidana", "tangkap", "sidang", "sulit", 
-    "menderita", "inflasi", "defisit", "blokir", "gagalkan", "vandalism", "ditahan", 
-    "polisi", "kejahatan", "meninggal", "sakit", "wabah", "teror", "banjir", 
-    "longsor", "sengketa", "parah", "pemecatan", "denda", "kecewa", "batal"
-}
+print("Memuat model sentimen IndoBERT dari Hugging Face...")
+try:
+    sentimen_pipeline = pipeline(
+        "text-classification",
+        model="witosetiadi/indobert-base-cased-sentiment-analysis",
+        tokenizer="witosetiadi/indobert-base-cased-sentiment-analysis"
+    )
+    print("Model IndoBERT berhasil dimuat.\n")
+except Exception as e:
+    print(f"Peringatan: Gagal memuat model IndoBERT ({e}). Pengujian sentimen akan menggunakan fallback Netral.")
+    sentimen_pipeline = None
 
 def analisa_sentimen(judul, ringkasan):
-    """Menghitung skor sentimen berdasarkan frekuensi kata positif vs negatif"""
-    teks = f"{judul} {ringkasan}".lower()
-    kata_kata = re.findall(r'\b[a-z-]+\b', teks)
+    """Analisis sentimen presisi berbasis AI IndoBERT"""
+    if not sentimen_pipeline:
+        return "Netral"
+        
+    teks = f"{judul}. {ringkasan}".strip()
+    if not teks:
+        return "Netral"
     
-    skor_pos = sum(1 for w in kata_kata if w in KATA_POSITIF)
-    skor_neg = sum(1 for w in kata_kata if w in KATA_NEGATIF)
+    # Potong teks maksimal 512 karakter sesuai konteks limit IndoBERT
+    teks_input = teks[:512]
     
-    if skor_pos > skor_neg:
-        return "Positif"
-    elif skor_neg > skor_pos:
-        return "Negatif"
-    else:
+    try:
+        hasil = sentimen_pipeline(teks_input)[0]
+        label = str(hasil['label']).upper()
+        
+        # Mapping label dari output model
+        if "POS" in label or "LABEL_0" in label:
+            return "Positif"
+        elif "NEG" in label or "LABEL_2" in label:
+            return "Negatif"
+        else:
+            return "Netral"
+    except Exception:
         return "Netral"
 
 # ----------------------------------------------------------------------
-# 1. DAFTAR RSS FEEDS (ANTARA NEWS & DETIK)
+# DAFTAR RSS FEEDS & KANAL INDEKS
 # ----------------------------------------------------------------------
 FEEDS_RSS = {
-    # ANTARA NEWS (17 KANAL)
     "antara-terkini":    {"url": "https://www.antaranews.com/rss/terkini.xml", "media": "Antara", "kategori": "Terkini"},
     "antara-top-news":   {"url": "https://www.antaranews.com/rss/top-news.xml", "media": "Antara", "kategori": "Top News"},
     "antara-politik":    {"url": "https://www.antaranews.com/rss/politik.xml", "media": "Antara", "kategori": "Politik"},
@@ -93,15 +99,11 @@ FEEDS_RSS = {
     "antara-warta-bumi": {"url": "https://www.antaranews.com/rss/warta-bumi.xml", "media": "Antara", "kategori": "Warta Bumi"},
     "antara-foto":       {"url": "https://www.antaranews.com/rss/foto.xml", "media": "Antara", "kategori": "Foto"},
 
-    # DETIK.COM (RSS)
     "detik-news":        {"url": "https://news.detik.com/rss", "media": "Detik", "kategori": "News"},
     "detik-finance":     {"url": "https://finance.detik.com/rss", "media": "Detik", "kategori": "Finance"},
     "detik-sport":       {"url": "https://sport.detik.com/rss", "media": "Detik", "kategori": "Sport"},
 }
 
-# ----------------------------------------------------------------------
-# 2. DAFTAR KANAL INDEKS DETIKCOM (NON-RSS)
-# ----------------------------------------------------------------------
 KANAL_INDEKS_DETIK = [
     {"subdomain": "inet", "kategori": "Teknologi"},
     {"subdomain": "hot", "kategori": "Hiburan"},
@@ -142,7 +144,12 @@ def format_tanggal_rfc2822(dt):
     return dt.strftime("%a, %d %b %Y %H:%M:%S %z")
 
 def ekstraksi_detail_halaman(url, media_default=""):
-    """Mengambil meta description, og:image, dan Penulis dari halaman detail artikel"""
+    """
+    Mengunjungi URL halaman berita untuk mengambil:
+    - Ringkasan / Deskripsi Meta
+    - URL Gambar Utama (OG Image)
+    - Nama Penulis secara eksplisit
+    """
     ringkasan = ""
     url_gambar = ""
     penulis = ""
@@ -177,26 +184,22 @@ def ekstraksi_detail_halaman(url, media_default=""):
             if meta_auth and meta_auth.get('content'):
                 penulis = meta_auth['content'].strip()
             
-            # Jika meta tag kosong, cari di struktur HTML
             if not penulis:
-                elem_author = soup.select_one('.detail__author, .read__author, .credit-title-name, .author, .byline, .penulis')
+                elem_author = soup.select_one('.detail__author, .read__author, .credit-title-name, .author, .byline, .penulis, .detail-author')
                 if elem_author:
                     penulis = elem_author.get_text(strip=True)
 
-            # Bersihkan format teks penulis
+            # Pembersihan string Penulis
             if penulis:
                 penulis = re.sub(r'^(Oleh|By|Penulis|Reporter)\s*:\s*', '', penulis, flags=re.I)
-                penulis = re.sub(r'\s*-\s*detik.*$', '', penulis, flags=re.I)
-                penulis = re.sub(r'\s*-\s*Kompas.*$', '', penulis, flags=re.I)
-                penulis = re.sub(r'\s*-\s*ANTARA.*$', '', penulis, flags=re.I)
+                penulis = re.sub(r'\s*-\s*(detik|Kompas|ANTARA).*$', '', penulis, flags=re.I)
                 penulis = penulis.strip()
 
     except Exception:
         pass
 
-    # Fallback jika penulis tidak ditemukan
     if not penulis and media_default:
-        penulis = f"Tim Redaksi {media_default}"
+        penulis = f"Redaksi {media_default}"
 
     return ringkasan, url_gambar, penulis
 
@@ -204,13 +207,17 @@ def ekstraksi_detail_halaman(url, media_default=""):
 # MODUL SCRAPING
 # ----------------------------------------------------------------------
 def ambil_rss(feed_info):
-    """Ekstraksi berita dari Feed RSS"""
+    """Ekstraksi berita dari Feed RSS + Penulis & Sentimen IndoBERT"""
     hasil = []
     try:
         resp = requests.get(feed_info["url"], headers=HEADERS, timeout=20)
         resp.raise_for_status()
-        root = ET.fromstring(resp.content)
         
+        try:
+            root = ET.fromstring(resp.content)
+        except ET.ParseError:
+            root = ET.fromstring(resp.text.encode('utf-8'))
+
         namespaces = {
             'media': 'http://search.yahoo.com/mrss/',
             'dc': 'http://purl.org/dc/elements/1.1/',
@@ -226,34 +233,42 @@ def ambil_rss(feed_info):
             cat_xml = item.findtext("category")
             kategori_berita = cat_xml.strip().capitalize() if cat_xml and cat_xml.strip() else feed_info["kategori"]
 
-            # Ekstraksi Penulis dari RSS Tag
+            # Penulis
             penulis = ""
             for tag_auth in ["dc:creator", "author", "creator"]:
                 found_p = item.findtext(tag_auth, namespaces=namespaces) or item.findtext(tag_auth)
                 if found_p and found_p.strip():
                     penulis = found_p.strip()
                     break
+
+            deskripsi = clean_html(raw_desc)
             
+            # Jika Penulis / Ringkasan belum lengkap dari RSS, baca langsung dari URL
+            if not penulis or len(deskripsi) < 30:
+                detail_desc, _, detail_penulis = ekstraksi_detail_halaman(link, media_default=feed_info["media"])
+                if not penulis and detail_penulis:
+                    penulis = detail_penulis
+                if len(deskripsi) < 30 and detail_desc:
+                    deskripsi = detail_desc
+
             if not penulis:
                 penulis = f"Redaksi {feed_info['media']}"
 
-            # Ekstraksi Gambar RSS
+            # Gambar
             url_gambar = ""
             enclosure = item.find("enclosure")
             if enclosure is not None and enclosure.get("url"):
                 url_gambar = enclosure.get("url")
-            
             if not url_gambar:
                 media_content = item.find("media:content", namespaces) or item.find("media:thumbnail", namespaces)
                 if media_content is not None and media_content.get("url"):
                     url_gambar = media_content.get("url")
-
             if not url_gambar and raw_desc:
                 match_img = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', raw_desc, re.IGNORECASE)
                 if match_img:
                     url_gambar = match_img.group(1)
 
-            deskripsi = clean_html(raw_desc)
+            # Analisis Sentimen AI
             sentimen = analisa_sentimen(judul, deskripsi)
 
             hasil.append({
@@ -272,7 +287,7 @@ def ambil_rss(feed_info):
     return hasil
 
 def ambil_indeks_detik(subdomain, kategori_nama, max_page=3):
-    """Scraping Indeks Detikcom hingga Halaman max_page"""
+    """Scraping Indeks Detikcom + Penulis & Sentimen IndoBERT"""
     hasil = []
     tgl_now = datetime.now().strftime("%m/%d/%Y")
     
@@ -318,13 +333,14 @@ def ambil_indeks_detik(subdomain, kategori_nama, max_page=3):
                         "URL Gambar": url_gambar,
                         "Media": "Detik"
                     })
+                    time.sleep(0.05)
         except Exception as e:
             print(f"Gagal scraping indeks Detik [{subdomain}] hal {page}: {e}")
             
     return hasil
 
 def ambil_indeks_kompas(max_page=3):
-    """Scraping Indeks Kompas.com hingga Halaman max_page"""
+    """Scraping Indeks Kompas.com + Penulis & Sentimen IndoBERT"""
     hasil = []
     seen_links = set()
     tgl_now = datetime.now().strftime("%Y-%m-%d")
@@ -365,6 +381,7 @@ def ambil_indeks_kompas(max_page=3):
                         "URL Gambar": url_gambar,
                         "Media": "Kompas"
                     })
+                    time.sleep(0.05)
             else:
                 for art in articles:
                     tag_a = art.find('a', href=True)
@@ -395,6 +412,7 @@ def ambil_indeks_kompas(max_page=3):
                         "URL Gambar": url_gambar,
                         "Media": "Kompas"
                     })
+                    time.sleep(0.05)
         except Exception as e:
             print(f"Gagal scraping indeks Kompas hal {page}: {e}")
 
@@ -415,6 +433,9 @@ def simpan_excel(df, path_output):
         except Exception as e:
             print(f"Gagal membaca Excel lama ({path_output}): {e}")
 
+    kolom_urut = ["Kategori", "Judul", "Tanggal Terbit", "Penulis", "Ringkasan", "Sentimen", "Link", "URL Gambar", "Media"]
+    df = df.reindex(columns=[c for c in kolom_urut if c in df.columns])
+
     with pd.ExcelWriter(path_output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Berita")
         ws = writer.sheets["Berita"]
@@ -430,7 +451,7 @@ def simpan_excel(df, path_output):
 # MAIN FUNCTION
 # ----------------------------------------------------------------------
 def main():
-    print("=== MULAI PENGAMBILAN BERITA AUTOMATIS (SENTIMEN + PENULIS) ===\n")
+    print("=== MULAI SCRAPING BERITA AUTOMATIS + AI SENTIMEN (INDOBERT) ===\n")
     semua_berita = []
 
     # 1. Ambil RSS Feeds
@@ -442,7 +463,7 @@ def main():
         semua_berita.extend(berita)
         time.sleep(0.1)
 
-    # 2. Scraping Indeks Detikcom (Halaman 1 s/d 3)
+    # 2. Scraping Indeks Detikcom
     print(f"\n2. Mengambil Indeks Kanal Detikcom (Halaman 1-{MAX_PAGE_INDEKS})...")
     for k_detik in KANAL_INDEKS_DETIK:
         print(f"   - [Detik] Indeks {k_detik['kategori']} ({k_detik['subdomain']}.detik.com)...", end=" ")
@@ -451,7 +472,7 @@ def main():
         semua_berita.extend(berita_detik)
         time.sleep(0.2)
 
-    # 3. Scraping Indeks Kompas.com (Halaman 1 s/d 3)
+    # 3. Scraping Indeks Kompas.com
     print(f"\n3. Mengambil Indeks Kompas.com (Halaman 1-{MAX_PAGE_INDEKS})...", end=" ")
     kompas_berita = ambil_indeks_kompas(max_page=MAX_PAGE_INDEKS)
     print(f"{len(kompas_berita)} berita")
@@ -493,7 +514,7 @@ def main():
     with open(os.path.join(OUTPUT_FOLDER, "index.json"), "w", encoding="utf-8") as f:
         json.dump(daftar, f, ensure_ascii=False, indent=2)
 
-    print("\n=== PROSES SELESAI! SEMUA BERITA & SENTIMEN BERHASIL DI-UPDATE ===")
+    print("\n=== PROSES SELESAI! INDOBERT BERHASIL MEMPROSES SEMUA BERITA ===")
 
 if __name__ == "__main__":
     main()
