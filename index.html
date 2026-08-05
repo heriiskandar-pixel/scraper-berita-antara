@@ -4,10 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Analisis Berita & Sentimen AI</title>
-    <!-- Library Eksternal -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
     <style>
         :root {
             --bg-color: #0f172a;
@@ -35,12 +33,6 @@
             margin-bottom: 24px;
         }
 
-        h1 {
-            margin: 0 0 8px 0;
-            font-size: 1.8rem;
-        }
-
-        /* KPI Cards */
         .kpi-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -67,7 +59,6 @@
             color: var(--accent-color);
         }
 
-        /* Chart Grid Layout */
         .chart-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -90,7 +81,6 @@
             font-weight: 600;
         }
 
-        /* Controls / Filters */
         .controls-panel {
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -128,14 +118,12 @@
             border: 1px solid var(--border-color);
         }
 
-        /* Data View Options */
         .view-toggle {
             margin-left: auto;
             display: flex;
             gap: 8px;
         }
 
-        /* Table & Card View */
         .data-container {
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -186,10 +174,9 @@
 <div class="container">
     <header>
         <h1>Dashboard Analisis Berita & Sentimen AI</h1>
-        <p style="color: var(--text-muted); margin: 0;">Visualisasi dan Filter Analisis Berita Interaktif</p>
     </header>
 
-    <!-- KPI Cards -->
+    <!-- Kartu KPI -->
     <div class="kpi-grid">
         <div class="kpi-card">
             <div class="kpi-title">Total Berita</div>
@@ -205,31 +192,30 @@
         </div>
     </div>
 
-    <!-- Chart Grid: Baris 1 (Hari & Sentimen), Baris 2 (Kategori & Media) -->
+    <!-- Grid Grafik -->
     <div class="chart-grid">
-        <!-- Baris 1: Grafik 1 - Berita / Hari -->
+        <!-- BARIS 1 -->
         <div class="chart-card">
             <div class="chart-title">Jumlah Berita / Hari</div>
             <canvas id="chartHari"></canvas>
         </div>
-        <!-- Baris 1: Grafik 2 - Sentimen -->
         <div class="chart-card">
             <div class="chart-title">Sentimen</div>
             <canvas id="chartSentimen"></canvas>
         </div>
-        <!-- Baris 2: Grafik 3 - Kategori -->
+
+        <!-- BARIS 2 -->
         <div class="chart-card">
             <div class="chart-title">Kategori</div>
             <canvas id="chartKategori"></canvas>
         </div>
-        <!-- Baris 2: Grafik 4 - Media -->
         <div class="chart-card">
             <div class="chart-title">Media</div>
             <canvas id="chartMedia"></canvas>
         </div>
     </div>
 
-    <!-- Controls / Filters -->
+    <!-- Panel Kontrol & Filter -->
     <div class="controls-panel">
         <input type="text" id="search-input" placeholder="Cari kata kunci...">
         
@@ -254,7 +240,7 @@
         </div>
     </div>
 
-    <!-- Data Display Container -->
+    <!-- Tampilan Data -->
     <div class="data-container">
         <div id="table-view">
             <table>
@@ -267,14 +253,10 @@
                         <th>Sentimen</th>
                     </tr>
                 </thead>
-                <tbody id="table-body">
-                    <!-- Data dimasukkan via JS -->
-                </tbody>
+                <tbody id="table-body"></tbody>
             </table>
         </div>
-        <div id="cards-view" class="cards-view" style="display: none;">
-            <!-- Data kartu dimasukkan via JS -->
-        </div>
+        <div id="cards-view" class="cards-view" style="display: none;"></div>
     </div>
 </div>
 
@@ -283,40 +265,31 @@
     let filteredData = [];
     let charts = {};
 
-    // Data Sampel untuk Pengujian (Bisa diganti dengan fetch asinkron dari index.json)
-    const sampleData = [
-        { Tanggal: '2026-03-01', Judul: 'Pengembangan AI di Indonesia', Media: 'Kompas', Kategori: 'Teknologi', Sentimen: 'Positif' },
-        { Tanggal: '2026-03-01', Judul: 'Tantangan Etika Regulasi AI', Media: 'Detik', Kategori: 'Hukum', Sentimen: 'Netral' },
-        { Tanggal: '2026-03-02', Judul: 'Inovasi AI Dalam Medis', Media: 'Tempo', Kategori: 'Kesehatan', Sentimen: 'Positif' },
-        { Tanggal: '2026-03-02', Judul: 'Dampak Kebocoran Data AI', Media: 'Detik', Kategori: 'Keamanan', Sentimen: 'Negatif' },
-        { Tanggal: '2026-03-02', Judul: 'Pasar Saham Sektor AI Naik', Media: 'Bisnis', Kategori: 'Ekonomi', Sentimen: 'Positif' },
-        { Tanggal: '2026-03-03', Judul: 'Sektor Perbankan Pakai Bot AI', Media: 'Bisnis', Kategori: 'Ekonomi', Sentimen: 'Positif' },
-        { Tanggal: '2026-03-03', Judul: 'Kritik Penggunaan AI di Sekolah', Media: 'Kompas', Kategori: 'Pendidikan', Sentimen: 'Negatif' },
-        { Tanggal: '2026-03-03', Judul: 'AI Membantu Prediksi Cuaca', Media: 'Tempo', Kategori: 'Teknologi', Sentimen: 'Positif' }
-    ];
-
     document.addEventListener('DOMContentLoaded', () => {
-        // Menggunakan data sampel (Ubah ke fetch jika membaca file external)
-        rawData = [...sampleData];
-        filteredData = [...rawData];
-
-        populateDropdowns();
-        updateDashboard();
+        // Mengambil data dari data/index.json
+        fetch('data/index.json')
+            .then(response => response.json())
+            .then(data => {
+                rawData = data;
+                filteredData = [...rawData];
+                populateDropdowns();
+                updateDashboard();
+            })
+            .catch(error => console.error('Gagal memuat data:', error));
     });
 
-    // Helper Fungsi untuk Mengurutkan Data Grafik (Tertinggi di Atas)
+    // Fungsi pengurutan agar nilai tertinggi selalu di posisi paling atas pada Horizontal Bar Chart
     function getSortedChartData(countsObj) {
-        const sorted = Object.entries(countsObj).sort((a, b) => b[1] - a[1]); // Descending
+        const sorted = Object.entries(countsObj).sort((a, b) => a[1] - b[1]); 
         return {
             labels: sorted.map(item => item[0]),
             values: sorted.map(item => item[1])
         };
     }
 
-    // Opsi Konfigurasi Utama Chart.js (Horizontal Bar Chart)
-    function createChartOptions(titleText, filterType) {
+    function createChartOptions(filterType) {
         return {
-            indexAxis: 'y', // Mengubah menjadi grafik batang horizontal
+            indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
@@ -344,27 +317,19 @@
     }
 
     function renderCharts() {
-        // 1. Hitung Frekuensi Data
         const countsHari = {}, countsSentimen = {}, countsKategori = {}, countsMedia = {};
 
         filteredData.forEach(item => {
-            countsHari[item.Tanggal] = (countsHari[item.Tanggal] || 0) + 1;
-            countsSentimen[item.Sentimen] = (countsSentimen[item.Sentimen] || 0) + 1;
-            countsKategori[item.Kategori] = (countsKategori[item.Kategori] || 0) + 1;
-            countsMedia[item.Media] = (countsMedia[item.Media] || 0) + 1;
+            if (item.Tanggal) countsHari[item.Tanggal] = (countsHari[item.Tanggal] || 0) + 1;
+            if (item.Sentimen) countsSentimen[item.Sentimen] = (countsSentimen[item.Sentimen] || 0) + 1;
+            if (item.Kategori) countsKategori[item.Kategori] = (countsKategori[item.Kategori] || 0) + 1;
+            if (item.Media) countsMedia[item.Media] = (countsMedia[item.Media] || 0) + 1;
         });
 
-        // 2. Urutkan Nilai Tertinggi ke Terendah
-        const dataHari = getSortedChartData(countsHari);
-        const dataSentimen = getSortedChartData(countsSentimen);
-        const dataKategori = getSortedChartData(countsKategori);
-        const dataMedia = getSortedChartData(countsMedia);
-
-        // 3. Render / Update Chart.js
-        updateOrCreateChart('chartHari', 'Hari', dataHari, '#38bdf8');
-        updateOrCreateChart('chartSentimen', 'Sentimen', dataSentimen, '#34d399');
-        updateOrCreateChart('chartKategori', 'Kategori', dataKategori, '#fbbf24');
-        updateOrCreateChart('chartMedia', 'Media', dataMedia, '#f472b6');
+        updateOrCreateChart('chartHari', 'Hari', getSortedChartData(countsHari), '#38bdf8');
+        updateOrCreateChart('chartSentimen', 'Sentimen', getSortedChartData(countsSentimen), '#34d399');
+        updateOrCreateChart('chartKategori', 'Kategori', getSortedChartData(countsKategori), '#fbbf24');
+        updateOrCreateChart('chartMedia', 'Media', getSortedChartData(countsMedia), '#f472b6');
     }
 
     function updateOrCreateChart(elementId, key, sortedData, color) {
@@ -385,15 +350,15 @@
                         borderRadius: 4
                     }]
                 },
-                options: createChartOptions(key, key)
+                options: createChartOptions(key)
             });
         }
     }
 
     function updateKPIs() {
         document.getElementById('kpi-total').innerText = filteredData.length;
-        document.getElementById('kpi-media').innerText = new Set(filteredData.map(d => d.Media)).size;
-        document.getElementById('kpi-kategori').innerText = new Set(filteredData.map(d => d.Kategori)).size;
+        document.getElementById('kpi-media').innerText = new Set(filteredData.map(d => d.Media).filter(Boolean)).size;
+        document.getElementById('kpi-kategori').innerText = new Set(filteredData.map(d => d.Kategori).filter(Boolean)).size;
     }
 
     function renderTableAndCards() {
@@ -404,25 +369,23 @@
         cardsView.innerHTML = '';
 
         filteredData.forEach(item => {
-            // Render Tabel
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td>${item.Tanggal}</td>
-                <td>${item.Judul}</td>
-                <td>${item.Media}</td>
-                <td>${item.Kategori}</td>
-                <td>${item.Sentimen}</td>
+                <td>${item.Tanggal || ''}</td>
+                <td>${item.Judul || ''}</td>
+                <td>${item.Media || ''}</td>
+                <td>${item.Kategori || ''}</td>
+                <td>${item.Sentimen || ''}</td>
             `;
             tbody.appendChild(tr);
 
-            // Render Kartu
             const card = document.createElement('div');
             card.className = 'news-card';
             card.innerHTML = `
-                <div style="font-size: 0.8rem; color: var(--text-muted);">${item.Tanggal} | ${item.Media}</div>
-                <h4 style="margin: 8px 0; color: var(--accent-color);">${item.Judul}</h4>
-                <div style="font-size: 0.85rem;">Kategori: <strong>${item.Kategori}</strong></div>
-                <div style="font-size: 0.85rem;">Sentimen: <strong>${item.Sentimen}</strong></div>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">${item.Tanggal || ''} | ${item.Media || ''}</div>
+                <h4 style="margin: 8px 0; color: var(--accent-color);">${item.Judul || ''}</h4>
+                <div style="font-size: 0.85rem;">Kategori: <strong>${item.Kategori || ''}</strong></div>
+                <div style="font-size: 0.85rem;">Sentimen: <strong>${item.Sentimen || ''}</strong></div>
             `;
             cardsView.appendChild(card);
         });
@@ -434,7 +397,6 @@
         renderTableAndCards();
     }
 
-    // Filter Handlers
     document.getElementById('search-input').addEventListener('input', filterData);
     document.getElementById('filter-media').addEventListener('change', filterData);
     document.getElementById('filter-sentimen').addEventListener('change', filterData);
@@ -447,7 +409,7 @@
         const kategoriValue = document.getElementById('filter-kategori').value;
 
         filteredData = rawData.filter(item => {
-            const matchSearch = item.Judul.toLowerCase().includes(searchValue);
+            const matchSearch = !searchValue || (item.Judul && item.Judul.toLowerCase().includes(searchValue));
             const matchMedia = !mediaValue || item.Media === mediaValue;
             const matchSentimen = !sentimenValue || item.Sentimen === sentimenValue;
             const matchKategori = !kategoriValue || item.Kategori === kategoriValue;
@@ -475,9 +437,9 @@
     }
 
     function populateDropdowns() {
-        const mediaList = [...new Set(rawData.map(d => d.Media))];
-        const sentimenList = [...new Set(rawData.map(d => d.Sentimen))];
-        const kategoriList = [...new Set(rawData.map(d => d.Kategori))];
+        const mediaList = [...new Set(rawData.map(d => d.Media).filter(Boolean))];
+        const sentimenList = [...new Set(rawData.map(d => d.Sentimen).filter(Boolean))];
+        const kategoriList = [...new Set(rawData.map(d => d.Kategori).filter(Boolean))];
 
         fillSelect('filter-media', mediaList);
         fillSelect('filter-sentimen', sentimenList);
