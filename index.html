@@ -1,740 +1,424 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Viewer Berita Interaktif</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg-base: #0d1117;
-    --bg-card: #161b22;
-    --bg-card-hover: #21262d;
-    --border-color: #30363d;
-    --text-primary: #e6edf3;
-    --text-secondary: #8b949e;
-    --accent-red: #da3633;
-    --accent-blue: #58a6ff;
-  }
+#!/usr/bin/env python3
+"""
+scrape_berita_rss.py
+====================
+Skrip komprehensif penarik berita otomatis (Cocok untuk Cron / Autorun tiap 1 jam):
+- Menarik seluruh RSS Feed ANTARA News (17 Kanal) & RSS Detikcom.
+- Melakukan scraping halaman Indeks Kanal Detikcom hingga Halaman 3 (max_page=3).
+- Melakukan scraping halaman Indeks Kompas.com hingga Halaman 3 (max_page=3).
+- Menggabungkan data baru dengan file Excel harian yang sudah ada secara kumulatif.
+- Mengeliminasi duplikasi berita secara otomatis berdasarkan URL (Link).
+"""
 
-  * { box-sizing: border-box; }
-  body {
-    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-    background-color: var(--bg-base);
-    color: var(--text-primary);
-    margin: 0;
-    padding: 24px;
-  }
+import os
+import re
+import time
+import json
+import requests
+import pandas as pd
+from datetime import datetime, timedelta, timezone
+from html import unescape
+from xml.etree import ElementTree as ET
+from bs4 import BeautifulSoup
+from dateutil import parser
 
-  /* Header */
-  .header-bar {
-    border-bottom: 2px solid var(--border-color);
-    padding-bottom: 12px;
-    margin-bottom: 20px;
-  }
-  .header-title h1 {
-    font-size: 22px;
-    font-weight: 700;
-    margin: 0 0 4px 0;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .header-title h1::before {
-    content: '';
-    display: inline-block;
-    width: 4px;
-    height: 22px;
-    background: var(--accent-red);
-    border-radius: 2px;
-  }
-  .sub { color: var(--text-secondary); font-size: 13px; margin: 0; }
+# ----------------------------------------------------------------------
+# PENGATURAN GLOBAL
+# ----------------------------------------------------------------------
+OUTPUT_FOLDER = "data"
+FILENAME_PREFIX = "berita"
+MAKS_UMUR_HARI = 7
+MAX_PAGE_INDEKS = 3  # Pengambilan hingga Halaman 3 untuk semua Indeks (Detik & Kompas)
 
-  /* KPI Cards */
-  .kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-    margin-bottom: 20px;
-  }
-  .kpi-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 16px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  }
-  .kpi-title { font-size: 12px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 6px; font-weight: 600; }
-  .kpi-value { font-size: 26px; font-weight: 700; color: var(--text-primary); }
-
-  /* Kontrol Filter */
-  .kontrol {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 12px 16px;
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 16px;
-    align-items: center;
-  }
-  select, input, button {
-    background: #0d1117;
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 13px;
-    outline: none;
-  }
-  select:focus, input:focus {
-    border-color: var(--accent-blue);
-  }
-  button {
-    background: var(--accent-blue);
-    color: #0d1117;
-    font-weight: 600;
-    border: none;
-    cursor: pointer;
-    transition: opacity 0.2s;
-  }
-  button:hover { opacity: 0.9; }
-  button#reset-filter {
-    background: transparent;
-    border: 1px solid var(--border-color);
-    color: var(--text-secondary);
-  }
-  button#reset-filter:hover { background: var(--bg-card-hover); color: var(--text-primary); }
-  input[type="text"] { flex: 1; min-width: 200px; }
-
-  /* Active Filters */
-  #filter-aktif {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 16px;
-    min-height: 28px;
-  }
-  .chip {
-    background: rgba(88, 166, 255, 0.15);
-    border: 1px solid var(--accent-blue);
-    color: var(--accent-blue);
-    border-radius: 16px;
-    padding: 4px 12px;
-    font-size: 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 600;
-  }
-  .chip button {
-    background: none;
-    border: none;
-    color: var(--accent-blue);
-    cursor: pointer;
-    padding: 0;
-    font-size: 13px;
-    line-height: 1;
-  }
-
-  /* Charts Layout */
-  .grafik-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 16px;
-    margin-bottom: 20px;
-  }
-  .kartu-grafik {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 16px;
-  }
-  .kartu-grafik h2 {
-    font-size: 14px;
-    font-weight: 600;
-    margin: 0 0 12px 0;
-    color: var(--text-primary);
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 8px;
-  }
-  .kartu-grafik canvas { max-height: 240px; cursor: pointer; }
-  .petunjuk { color: var(--text-secondary); font-size: 11px; margin-top: 8px; }
-
-  /* Table Layout */
-  .table-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 16px;
-  }
-  #status { color: var(--text-secondary); font-size: 12px; margin-bottom: 12px; }
-  #tabel-wrap { overflow-x: auto; max-height: 60vh; overflow-y: auto; }
-
-  table {
-    border-collapse: collapse;
-    width: 100%;
-    font-size: 13px;
-  }
-  th, td {
-    border: 1px solid var(--border-color);
-    padding: 10px 12px;
-    text-align: left;
-    vertical-align: middle;
-  }
-  th {
-    background: #10151c;
-    cursor: pointer;
-    user-select: none;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
-  th:hover { background: var(--bg-card-hover); }
-  tr:nth-child(even) { background: #0d1117; }
-  tr:hover { background: var(--bg-card-hover); }
-  a { color: var(--accent-blue); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  .panah { opacity: 0.5; font-size: 11px; margin-left: 4px; }
-  
-  /* Thumbnail Gambar */
-  .img-preview {
-    width: 120px;
-    height: 70px;
-    object-fit: cover;
-    border-radius: 6px;
-    display: block;
-    cursor: zoom-in;
-    border: 1px solid var(--border-color);
-    background-color: #0d1117;
-    transition: transform 0.2s, border-color 0.2s;
-  }
-  .img-preview:hover {
-    transform: scale(1.05);
-    border-color: var(--accent-blue);
-  }
-  .no-img {
-    color: var(--text-secondary);
-    font-size: 11px;
-    font-style: italic;
-  }
-
-  /* Modal Fullscreen Lightbox */
-  .modal-gambar {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background-color: rgba(0, 0, 0, 0.88);
-    backdrop-filter: blur(4px);
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
-  }
-  .modal-gambar img {
-    max-width: 90%;
-    max-height: 80vh;
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-  }
-  .modal-close {
-    position: absolute;
-    top: 20px;
-    right: 30px;
-    color: #fff;
-    font-size: 32px;
-    font-weight: bold;
-    cursor: pointer;
-    user-select: none;
-  }
-  .modal-caption {
-    color: var(--text-primary);
-    margin-top: 14px;
-    font-size: 14px;
-    font-weight: 600;
-    text-align: center;
-    padding: 0 20px;
-  }
-</style>
-</head>
-<body>
-
-<div class="header-bar">
-  <div class="header-title">
-    <h1>📰 Viewer Berita Interaktif</h1>
-    <p class="sub">Dashboard Monitoring, Filter Media, & Analisis Publikasi Berita</p>
-  </div>
-</div>
-
-<!-- KPI Cards -->
-<div class="kpi-grid">
-  <div class="kpi-card">
-    <div class="kpi-title">Total Berita</div>
-    <div class="kpi-value" id="kpi-total">0</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-title">Total Media</div>
-    <div class="kpi-value" id="kpi-media">0</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-title">Total Kategori</div>
-    <div class="kpi-value" id="kpi-kategori">0</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-title">Rata-rata/Hari</div>
-    <div class="kpi-value" id="kpi-avg">0</div>
-  </div>
-</div>
-
-<!-- Grafik Interaktif -->
-<div class="grafik-grid">
-  <div class="kartu-grafik">
-    <h2>Jumlah Berita per Hari</h2>
-    <canvas id="grafik-per-hari"></canvas>
-    <div class="petunjuk">Klik batang untuk filter tanggal.</div>
-  </div>
-  <div class="kartu-grafik">
-    <h2>Jumlah Berita per Media</h2>
-    <canvas id="grafik-per-media"></canvas>
-    <div class="petunjuk">Klik batang untuk filter Media.</div>
-  </div>
-  <div class="kartu-grafik">
-    <h2>Jumlah Berita per Kategori</h2>
-    <canvas id="grafik-per-kategori"></canvas>
-    <div class="petunjuk">Klik batang untuk filter Kategori.</div>
-  </div>
-</div>
-
-<!-- Kontrol & Filter -->
-<div class="kontrol">
-  <label for="pilih-tanggal">Tanggal:</label>
-  <select id="pilih-tanggal"></select>
-  
-  <label for="pilih-media">Media:</label>
-  <select id="pilih-media"></select>
-
-  <input type="text" id="cari" placeholder="Cari judul, kata kunci, kategori...">
-  <button id="reset-filter">Reset Filter</button>
-</div>
-
-<div id="filter-aktif"></div>
-
-<!-- Tabel Data -->
-<div class="table-card">
-  <div id="status">Memuat data...</div>
-  <div id="tabel-wrap"></div>
-</div>
-
-<!-- Modal Fullscreen Lightbox untuk Gambar -->
-<div id="modal-gambar" class="modal-gambar" onclick="tutupModalGambar()">
-  <span class="modal-close">&times;</span>
-  <img id="modal-img-src" src="" alt="Full Preview">
-  <div id="modal-caption" class="modal-caption"></div>
-</div>
-
-<script>
-let semuaData = [];        
-let filterTanggal = null;  
-let filterKategori = null; 
-let filterMedia = null;    
-let kolomUrut = null;
-let arahUrut = 1;
-
-let chartHari = null;
-let chartKategori = null;
-let chartMedia = null;
-
-const elPilihTanggal = document.getElementById('pilih-tanggal');
-const elPilihMedia = document.getElementById('pilih-media');
-const elCari = document.getElementById('cari');
-const elStatus = document.getElementById('status');
-const elTabelWrap = document.getElementById('tabel-wrap');
-const elFilterAktif = document.getElementById('filter-aktif');
-const elResetFilter = document.getElementById('reset-filter');
-
-const WARNA_NORMAL = '#30363d';
-const WARNA_AKTIF = '#58a6ff';
-const OPSI_WARNA = ['#58a6ff', '#3fb950', '#f0883e', '#db61a2', '#a371f7', '#e3b341', '#79c0ff', '#56d364'];
-
-// ---------- MUAT DATA ----------
-
-async function muatSemuaData() {
-  try {
-    const res = await fetch('data/index.json?_=' + Date.now());
-    if (!res.ok) throw new Error('index.json tidak ditemukan');
-    const daftar = await res.json();  
-
-    if (daftar.length === 0) {
-      elStatus.textContent = 'Belum ada file data berita tersedia.';
-      return;
-    }
-
-    elPilihTanggal.innerHTML = '<option value="">Semua Tanggal</option>' +
-      daftar.map(d => `<option value="${d.tanggal}">${d.tanggal}</option>`).join('');
-
-    elStatus.textContent = `Memuat ${daftar.length} file data...`;
-
-    const hasil = await Promise.all(daftar.map(async d => {
-      try {
-        const r = await fetch('data/' + d.file + '?_=' + Date.now());
-        if (!r.ok) return [];
-        const buffer = await r.arrayBuffer();
-        const wb = XLSX.read(buffer, { type: 'array' });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        const baris = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-        return baris.map(b => ({ ...b, _tanggalFile: d.tanggal }));
-      } catch (e) {
-        return [];
-      }
-    }));
-
-    semuaData = hasil.flat();
-    populasiOpsiMedia();
-    renderSemua();
-  } catch (e) {
-    elStatus.textContent = 'Gagal memuat data: ' + e.message;
-  }
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
-function populasiOpsiMedia() {
-  const setMedia = new Set(semuaData.map(b => String(b['Media'] ?? b['media'] ?? '').trim()).filter(Boolean));
-  const listMedia = Array.from(setMedia).sort();
-  elPilihMedia.innerHTML = '<option value="">Semua Media</option>' +
-    listMedia.map(m => `<option value="${m}">${m}</option>`).join('');
+# ----------------------------------------------------------------------
+# 1. DAFTAR RSS FEEDS (ANTARA NEWS & DETIK)
+# ----------------------------------------------------------------------
+FEEDS_RSS = {
+    # --- ANTARA NEWS (SELURUH KANAL) ---
+    "antara-terkini":      {"url": "https://www.antaranews.com/rss/terkini.xml", "media": "Antara", "kategori": "Terkini"},
+    "antara-top-news":     {"url": "https://www.antaranews.com/rss/top-news.xml", "media": "Antara", "kategori": "Top News"},
+    "antara-politik":      {"url": "https://www.antaranews.com/rss/politik.xml", "media": "Antara", "kategori": "Politik"},
+    "antara-hukum":        {"url": "https://www.antaranews.com/rss/hukum.xml", "media": "Antara", "kategori": "Hukum"},
+    "antara-ekonomi":      {"url": "https://www.antaranews.com/rss/ekonomi.xml", "media": "Antara", "kategori": "Ekonomi"},
+    "antara-metro":        {"url": "https://www.antaranews.com/rss/metro.xml", "media": "Antara", "kategori": "Metro"},
+    "antara-sepakbola":    {"url": "https://www.antaranews.com/rss/sepakbola.xml", "media": "Antara", "kategori": "Sepakbola"},
+    "antara-olahraga":     {"url": "https://www.antaranews.com/rss/olahraga.xml", "media": "Antara", "kategori": "Olahraga"},
+    "antara-humaniora":    {"url": "https://www.antaranews.com/rss/humaniora.xml", "media": "Antara", "kategori": "Humaniora"},
+    "antara-lifestyle":    {"url": "https://www.antaranews.com/rss/lifestyle.xml", "media": "Antara", "kategori": "Lifestyle"},
+    "antara-hiburan":      {"url": "https://www.antaranews.com/rss/hiburan.xml", "media": "Antara", "kategori": "Hiburan"},
+    "antara-dunia":        {"url": "https://www.antaranews.com/rss/dunia.xml", "media": "Antara", "kategori": "Dunia"},
+    "antara-infografis":   {"url": "https://www.antaranews.com/rss/infografis.xml", "media": "Antara", "kategori": "Infografis"},
+    "antara-tekno":        {"url": "https://www.antaranews.com/rss/tekno.xml", "media": "Antara", "kategori": "Tekno"},
+    "antara-otomotif":     {"url": "https://www.antaranews.com/rss/otomotif.xml", "media": "Antara", "kategori": "Otomotif"},
+    "antara-warta-bumi":   {"url": "https://www.antaranews.com/rss/warta-bumi.xml", "media": "Antara", "kategori": "Warta Bumi"},
+    "antara-foto":         {"url": "https://www.antaranews.com/rss/foto.xml", "media": "Antara", "kategori": "Foto"},
+
+    # --- DETIK.COM (RSS) ---
+    "detik-news":          {"url": "https://news.detik.com/rss", "media": "Detik", "kategori": "News"},
+    "detik-finance":       {"url": "https://finance.detik.com/rss", "media": "Detik", "kategori": "Finance"},
+    "detik-sport":         {"url": "https://sport.detik.com/rss", "media": "Detik", "kategori": "Sport"},
 }
 
-// ---------- FUNGSI FILTER & METRIK ----------
+# ----------------------------------------------------------------------
+# 2. DAFTAR KANAL INDEKS DETIKCOM (NON-RSS)
+# ----------------------------------------------------------------------
+KANAL_INDEKS_DETIK = [
+    {"subdomain": "inet", "kategori": "Teknologi"},
+    {"subdomain": "hot", "kategori": "Hiburan"},
+    {"subdomain": "health", "kategori": "Kesehatan"},
+    {"subdomain": "food", "kategori": "Kuliner"},
+    {"subdomain": "travel", "kategori": "Wisata"},
+    {"subdomain": "oto", "kategori": "Otomotif"},
+    {"subdomain": "edu", "kategori": "Edukasi"},
+    {"subdomain": "hikmah", "kategori": "Hikmah"},
+    {"subdomain": "properti", "kategori": "Properti"},
+    {"subdomain": "wolipop", "kategori": "Gaya Hidup"},
+]
 
-function cocokPencarian(baris, kataKunci) {
-  if (!kataKunci) return true;
-  return Object.values(baris).some(v => String(v).toLowerCase().includes(kataKunci));
-}
+# ----------------------------------------------------------------------
+# FUNGSI UTILITAS
+# ----------------------------------------------------------------------
+def clean_html(raw_html):
+    if not raw_html:
+        return ""
+    text = re.sub(r"<[^>]+>", "", raw_html)
+    return unescape(text).strip()
 
-function pecahKategori(baris) {
-  const mentah = String(baris['Kategori'] ?? baris['kategori'] ?? '').trim();
-  if (!mentah) return [];
-  return mentah.split(',').map(s => s.trim()).filter(Boolean);
-}
+def parse_tanggal(raw):
+    if not raw:
+        return None
+    try:
+        dt = parser.parse(str(raw), fuzzy=True)
+        if dt.tzinfo is None:
+            wib = timezone(timedelta(hours=7))
+            dt = dt.replace(tzinfo=wib)
+        return dt
+    except Exception:
+        return None
 
-function ambilNilaiMedia(baris) {
-  return String(baris['Media'] ?? baris['media'] ?? '').trim();
-}
+def format_tanggal_rfc2822(dt):
+    if not dt:
+        return ""
+    return dt.strftime("%a, %d %b %Y %H:%M:%S %z")
 
-function dataTersaring() {
-  const kataKunci = elCari.value.trim().toLowerCase();
-  return semuaData.filter(b => {
-    if (!cocokPencarian(b, kataKunci)) return false;
-    if (filterTanggal && b._tanggalFile !== filterTanggal) return false;
-    if (filterMedia && ambilNilaiMedia(b).toLowerCase() !== filterMedia.toLowerCase()) return false;
-    if (filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
-    return true;
-  });
-}
+def ekstraksi_detail_halaman(url):
+    """Mengambil meta description, og:image, dan author dari halaman berita jika belum ada"""
+    ringkasan = ""
+    url_gambar = ""
+    penulis = ""
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=5)
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text, 'lxml')
+            
+            # Ringkasan
+            meta_desc = soup.find('meta', attrs={'name': 'description'}) or \
+                        soup.find('meta', attrs={'property': 'og:description'})
+            if meta_desc and meta_desc.get('content'):
+                ringkasan = meta_desc['content'].strip()
+            else:
+                p_first = soup.find('p')
+                if p_first:
+                    ringkasan = p_first.get_text(strip=True)
 
-function dataUntukGrafik(abaikanFilter) {
-  const kataKunci = elCari.value.trim().toLowerCase();
-  return semuaData.filter(b => {
-    if (!cocokPencarian(b, kataKunci)) return false;
-    if (abaikanFilter !== 'tanggal' && filterTanggal && b._tanggalFile !== filterTanggal) return false;
-    if (abaikanFilter !== 'media' && filterMedia && ambilNilaiMedia(b).toLowerCase() !== filterMedia.toLowerCase()) return false;
-    if (abaikanFilter !== 'kategori' && filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
-    return true;
-  });
-}
+            # URL Gambar
+            meta_img = soup.find('meta', attrs={'property': 'og:image'}) or \
+                       soup.find('meta', attrs={'name': 'twitter:image'})
+            if meta_img and meta_img.get('content'):
+                url_gambar = meta_img['content'].strip()
 
-function updateKPI(data) {
-  document.getElementById('kpi-total').textContent = data.length.toLocaleString('id-ID');
+            # Penulis
+            meta_author = soup.find('meta', attrs={'name': 'author'})
+            if meta_author and meta_author.get('content'):
+                penulis = meta_author['content'].strip()
+    except Exception:
+        pass
+    return ringkasan, url_gambar, penulis
 
-  const setMedia = new Set(data.map(b => ambilNilaiMedia(b)).filter(Boolean));
-  document.getElementById('kpi-media').textContent = setMedia.size;
+# ----------------------------------------------------------------------
+# MODUL SCRAPING
+# ----------------------------------------------------------------------
 
-  const setKat = new Set();
-  data.forEach(b => pecahKategori(b).forEach(k => setKat.add(k)));
-  document.getElementById('kpi-kategori').textContent = setKat.size;
-
-  const setHari = new Set(data.map(b => b._tanggalFile));
-  const avg = setHari.size > 0 ? (data.length / setHari.size).toFixed(1) : 0;
-  document.getElementById('kpi-avg').textContent = avg;
-}
-
-// ---------- RENDER GRAFIK ----------
-
-function renderGrafikPerHari() {
-  const data = dataUntukGrafik('tanggal');
-  const hitung = {};
-  for (const b of data) {
-    hitung[b._tanggalFile] = (hitung[b._tanggalFile] || 0) + 1;
-  }
-  const label = Object.keys(hitung).sort();
-  const nilai = label.map(l => hitung[l]);
-  const warna = label.map(l => l === filterTanggal ? WARNA_AKTIF : WARNA_NORMAL);
-
-  const ctx = document.getElementById('grafik-per-hari');
-  if (chartHari) chartHari.destroy();
-  chartHari = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: label,
-      datasets: [{ label: 'Jumlah berita', data: nilai, backgroundColor: warna, borderRadius: 4 }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } },
-        y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' }, beginAtZero: true }
-      },
-      onClick: (evt, elemen) => {
-        if (elemen.length === 0) return;
-        const tanggalDiklik = label[elemen[0].index];
-        filterTanggal = (filterTanggal === tanggalDiklik) ? null : tanggalDiklik;
-        elPilihTanggal.value = filterTanggal || '';
-        renderSemua();
-      }
-    }
-  });
-}
-
-function renderGrafikPerMedia() {
-  const data = dataUntukGrafik('media');
-  const hitung = {};
-  for (const b of data) {
-    const m = ambilNilaiMedia(b) || 'Lainnya';
-    hitung[m] = (hitung[m] || 0) + 1;
-  }
-  const entri = Object.entries(hitung).sort((a, b) => b[1] - a[1]);
-  const label = entri.map(e => e[0]);
-  const nilai = entri.map(e => e[1]);
-  const warna = label.map((l, i) => {
-    if (filterMedia) return l.toLowerCase() === filterMedia.toLowerCase() ? WARNA_AKTIF : WARNA_NORMAL;
-    return OPSI_WARNA[i % OPSI_WARNA.length];
-  });
-
-  const ctx = document.getElementById('grafik-per-media');
-  if (chartMedia) chartMedia.destroy();
-  chartMedia = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: label,
-      datasets: [{ label: 'Jumlah berita', data: nilai, backgroundColor: warna, borderRadius: 4 }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } },
-        y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' }, beginAtZero: true }
-      },
-      onClick: (evt, elemen) => {
-        if (elemen.length === 0) return;
-        const mediaDiklik = label[elemen[0].index];
-        filterMedia = (filterMedia === mediaDiklik) ? null : mediaDiklik;
-        elPilihMedia.value = filterMedia || '';
-        renderSemua();
-      }
-    }
-  });
-}
-
-function renderGrafikPerKategori() {
-  const data = dataUntukGrafik('kategori');
-  const hitung = {};
-  for (const b of data) {
-    for (const k of pecahKategori(b)) {
-      hitung[k] = (hitung[k] || 0) + 1;
-    }
-  }
-  const entri = Object.entries(hitung).sort((a, b) => b[1] - a[1]);
-  const label = entri.map(e => e[0]);
-  const nilai = entri.map(e => e[1]);
-  const warna = label.map((l, i) => {
-    if (filterKategori) return l === filterKategori ? WARNA_AKTIF : WARNA_NORMAL;
-    return OPSI_WARNA[i % OPSI_WARNA.length];
-  });
-
-  const ctx = document.getElementById('grafik-per-kategori');
-  if (chartKategori) chartKategori.destroy();
-  chartKategori = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: label,
-      datasets: [{ label: 'Jumlah berita', data: nilai, backgroundColor: warna, borderRadius: 4 }]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' }, beginAtZero: true },
-        y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } }
-      },
-      onClick: (evt, elemen) => {
-        if (elemen.length === 0) return;
-        const kategoriDiklik = label[elemen[0].index];
-        filterKategori = (filterKategori === kategoriDiklik) ? null : kategoriDiklik;
-        renderSemua();
-      }
-    }
-  });
-}
-
-// ---------- RENDER CHIP FILTER ----------
-
-function renderChipFilter() {
-  const chip = [];
-  if (filterTanggal) {
-    chip.push(`<span class="chip">Tanggal: ${filterTanggal} <button onclick="hapusFilterTanggal()">✕</button></span>`);
-  }
-  if (filterMedia) {
-    chip.push(`<span class="chip">Media: ${filterMedia} <button onclick="hapusFilterMedia()">✕</button></span>`);
-  }
-  if (filterKategori) {
-    chip.push(`<span class="chip">Kategori: ${filterKategori} <button onclick="hapusFilterKategori()">✕</button></span>`);
-  }
-  elFilterAktif.innerHTML = chip.join('');
-}
-
-function hapusFilterTanggal() { filterTanggal = null; elPilihTanggal.value = ''; renderSemua(); }
-function hapusFilterMedia() { filterMedia = null; elPilihMedia.value = ''; renderSemua(); }
-function hapusFilterKategori() { filterKategori = null; renderSemua(); }
-
-// ---------- MODAL GAMBAR & TABEL ----------
-
-function bukaModalGambar(url, judul) {
-  const modal = document.getElementById('modal-gambar');
-  const img = document.getElementById('modal-img-src');
-  const caption = document.getElementById('modal-caption');
-  
-  img.src = url;
-  caption.textContent = judul || 'Gambar Berita';
-  modal.style.display = 'flex';
-}
-
-function tutupModalGambar() {
-  document.getElementById('modal-gambar').style.display = 'none';
-}
-
-// Cek apakah suatu nama kolom merupakan kolom gambar
-function isKolomGambar(namaKolom) {
-  const k = namaKolom.toLowerCase().trim();
-  return ['url gambar', 'gambar', 'url_gambar', 'image', 'url image', 'foto', 'thumbnail'].includes(k);
-}
-
-// Cek apakah suatu nama kolom merupakan kolom link
-function isKolomLink(namaKolom) {
-  const k = namaKolom.toLowerCase().trim();
-  return ['link', 'url', 'link berita', 'url berita'].includes(k);
-}
-
-function renderTabel(data) {
-  if (kolomUrut) {
-    data.sort((a, b) => {
-      const va = String(a[kolomUrut] ?? '');
-      const vb = String(b[kolomUrut] ?? '');
-      return va.localeCompare(vb, 'id') * arahUrut;
-    });
-  }
-
-  elStatus.textContent = `${data.length} berita ditampilkan (dari total ${semuaData.length})`;
-
-  if (data.length === 0) {
-    elTabelWrap.innerHTML = '<p style="color:#8b949e; padding: 12px 0;">Tidak ada berita yang cocok dengan filter.</p>';
-    return;
-  }
-
-  const kolom = Object.keys(semuaData[0]).filter(k => k !== '_tanggalFile');
-
-  let html = '<table><thead><tr>';
-  for (const k of kolom) {
-    let panah = '';
-    if (kolomUrut === k) panah = arahUrut === 1 ? ' ▲' : ' ▼';
-    html += `<th data-kolom="${k}">${k}<span class="panah">${panah}</span></th>`;
-  }
-  html += '</tr></thead><tbody>';
-
-  for (const baris of data) {
-    html += '<tr>';
-    for (const k of kolom) {
-      let nilai = String(baris[k] ?? '').trim();
-      let judulBerita = baris['Judul'] || baris['judul'] || baris['Title'] || '';
-
-      if (isKolomLink(k) && nilai) {
-        html += `<td><a href="${nilai}" target="_blank" rel="noopener">Buka Berita ↗</a></td>`;
-      } else if (isKolomGambar(k)) {
-        if (nilai && (nilai.startsWith('http://') || nilai.startsWith('https://') || nilai.startsWith('data:image'))) {
-          const safeJudul = String(judulBerita).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-          html += `<td><img src="${nilai}" class="img-preview" loading="lazy" alt="Gambar" 
-                      onerror="this.onerror=null; this.outerHTML='<span class=\\'no-img\\'>Gagal memuat</span>';"
-                      onclick="bukaModalGambar('${nilai}', '${safeJudul}')"></td>`;
-        } else {
-          html += `<td><span class="no-img">(Tidak ada gambar)</span></td>`;
+def ambil_rss(feed_info):
+    """Ekstraksi berita dari Feed RSS"""
+    hasil = []
+    try:
+        resp = requests.get(feed_info["url"], headers=HEADERS, timeout=20)
+        resp.raise_for_status()
+        root = ET.fromstring(resp.content)
+        
+        namespaces = {
+            'media': 'http://search.yahoo.com/mrss/',
+            'content': 'http://purl.org/rss/1.0/modules/content/'
         }
-      } else {
-        html += `<td>${nilai || '-'}</td>`;
-      }
-    }
-    html += '</tr>';
-  }
-  html += '</tbody></table>';
-  elTabelWrap.innerHTML = html;
 
-  elTabelWrap.querySelectorAll('th').forEach(th => {
-    th.addEventListener('click', () => {
-      const k = th.dataset.kolom;
-      if (kolomUrut === k) {
-        arahUrut *= -1;
-      } else {
-        kolomUrut = k;
-        arahUrut = 1;
-      }
-      renderTabel(dataTersaring());
-    });
-  });
-}
+        for item in root.findall(".//item"):
+            judul = (item.findtext("title") or "").strip()
+            link = (item.findtext("link") or "").strip()
+            tanggal = (item.findtext("pubDate") or "").strip()
+            raw_desc = item.findtext("description") or ""
+            
+            cat_xml = item.findtext("category")
+            kategori_berita = cat_xml.strip().capitalize() if cat_xml and cat_xml.strip() else feed_info["kategori"]
 
-// ---------- RENDER UTAMA ----------
+            # Ekstraksi Gambar RSS
+            url_gambar = ""
+            enclosure = item.find("enclosure")
+            if enclosure is not None and enclosure.get("url"):
+                url_gambar = enclosure.get("url")
+            
+            if not url_gambar:
+                media_content = item.find("media:content", namespaces) or item.find("media:thumbnail", namespaces)
+                if media_content is not None and media_content.get("url"):
+                    url_gambar = media_content.get("url")
 
-function renderSemua() {
-  const dataFiltered = dataTersaring();
-  updateKPI(dataFiltered);
-  renderChipFilter();
-  renderGrafikPerHari();
-  renderGrafikPerMedia();
-  renderGrafikPerKategori();
-  renderTabel(dataFiltered);
-}
+            if not url_gambar and raw_desc:
+                match_img = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', raw_desc, re.IGNORECASE)
+                if match_img:
+                    url_gambar = match_img.group(1)
 
-// ---------- EVENT LISTENERS ----------
+            deskripsi = clean_html(raw_desc)
 
-elPilihTanggal.addEventListener('change', () => {
-  filterTanggal = elPilihTanggal.value || null;
-  renderSemua();
-});
-elPilihMedia.addEventListener('change', () => {
-  filterMedia = elPilihMedia.value || null;
-  renderSemua();
-});
-elCari.addEventListener('input', renderSemua);
-elResetFilter.addEventListener('click', () => {
-  filterTanggal = null;
-  filterMedia = null;
-  filterKategori = null;
-  elPilihTanggal.value = '';
-  elPilihMedia.value = '';
-  elCari.value = '';
-  renderSemua();
-});
+            hasil.append({
+                "Kategori": kategori_berita,
+                "Judul": judul,
+                "Tanggal Terbit": tanggal,
+                "Penulis": "",
+                "Ringkasan": deskripsi,
+                "Link": link,
+                "URL Gambar": url_gambar,
+                "Media": feed_info["media"]
+            })
+    except Exception as e:
+        print(f"Gagal ambil RSS {feed_info['media']} ({feed_info['kategori']}): {e}")
+    return hasil
 
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') tutupModalGambar();
-});
+def ambil_indeks_detik(subdomain, kategori_nama, max_page=3):
+    """Scraping halaman Indeks Detikcom Non-RSS hingga Halaman max_page"""
+    hasil = []
+    tgl_now = datetime.now().strftime("%m/%d/%Y")
+    
+    for page in range(1, max_page + 1):
+        url = f"https://{subdomain}.detik.com/indeks/{page}?date={tgl_now}"
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=15)
+            if resp.status_code != 200:
+                break
+                
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            articles = soup.find_all('article')
+            
+            for art in articles:
+                tag_a = art.find('a', href=True)
+                if not tag_a:
+                    continue
+                    
+                link = tag_a['href']
+                tag_title = art.find('h3') or art.find('h2') or tag_a
+                judul = tag_title.get_text(strip=True) if tag_title else ""
+                
+                tag_img = art.find('img')
+                url_gambar = ""
+                if tag_img:
+                    url_gambar = tag_img.get('src') or tag_img.get('data-src') or ""
 
-muatSemuaData();
-</script>
+                if len(judul) > 15:
+                    ringkasan, img_detail, penulis = ekstraksi_detail_halaman(link)
+                    if not url_gambar:
+                        url_gambar = img_detail
 
-</body>
-</html>
+                    hasil.append({
+                        "Kategori": kategori_nama,
+                        "Judul": judul,
+                        "Tanggal Terbit": format_tanggal_rfc2822(datetime.now(timezone(timedelta(hours=7)))),
+                        "Penulis": penulis,
+                        "Ringkasan": ringkasan,
+                        "Link": link,
+                        "URL Gambar": url_gambar,
+                        "Media": "Detik"
+                    })
+        except Exception as e:
+            print(f"Gagal scraping indeks Detik [{subdomain}] hal {page}: {e}")
+            
+    return hasil
+
+def ambil_indeks_kompas(max_page=3):
+    """Scraping halaman Indeks Kompas.com hingga Halaman max_page"""
+    hasil = []
+    seen_links = set()
+    tgl_now = datetime.now().strftime("%Y-%m-%d")
+
+    for page in range(1, max_page + 1):
+        url = f"https://indeks.kompas.com/?site=all&date={tgl_now}&page={page}"
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=15)
+            if resp.status_code != 200:
+                break
+                
+            soup = BeautifulSoup(resp.text, 'lxml')
+            # Mencari elemen daftar berita pada indeks Kompas
+            articles = soup.find_all('div', class_='article__list') or soup.find_all('div', class_='articleList')
+            
+            if not articles:
+                # Fallback ke pencarian link umum
+                link_candidates = soup.find_all('a', href=re.compile(r'/read/\d{4}/\d{2}/\d{2}/'))
+                for a in link_candidates:
+                    link = a.get('href')
+                    if not link or link in seen_links:
+                        continue
+                    if link.startswith("//"): link = "https:" + link
+                    elif link.startswith("/"): link = "https://www.kompas.com" + link
+                    
+                    judul = a.get_text(strip=True)
+                    if len(judul) < 20: continue
+                    
+                    seen_links.add(link)
+                    ringkasan, url_gambar, penulis = ekstraksi_detail_halaman(link)
+                    
+                    hasil.append({
+                        "Kategori": "Berita Utama",
+                        "Judul": judul,
+                        "Tanggal Terbit": format_tanggal_rfc2822(datetime.now(timezone(timedelta(hours=7)))),
+                        "Penulis": penulis,
+                        "Ringkasan": ringkasan,
+                        "Link": link,
+                        "URL Gambar": url_gambar,
+                        "Media": "Kompas"
+                    })
+            else:
+                for art in articles:
+                    tag_a = art.find('a', href=True)
+                    if not tag_a: continue
+                    
+                    link = tag_a['href']
+                    if link in seen_links: continue
+                    seen_links.add(link)
+
+                    tag_title = art.find('h3') or art.find('h2') or tag_a
+                    judul = tag_title.get_text(strip=True) if tag_title else ""
+                    if len(judul) < 15: continue
+
+                    # Kategori
+                    tag_cat = art.find('div', class_='article__subtitle') or art.find('h4')
+                    kategori = tag_cat.get_text(strip=True) if tag_cat else "General"
+
+                    ringkasan, url_gambar, penulis = ekstraksi_detail_halaman(link)
+
+                    hasil.append({
+                        "Kategori": kategori,
+                        "Judul": judul,
+                        "Tanggal Terbit": format_tanggal_rfc2822(datetime.now(timezone(timedelta(hours=7)))),
+                        "Penulis": penulis,
+                        "Ringkasan": ringkasan,
+                        "Link": link,
+                        "URL Gambar": url_gambar,
+                        "Media": "Kompas"
+                    })
+        except Exception as e:
+            print(f"Gagal scraping indeks Kompas hal {page}: {e}")
+
+    return hasil
+
+# ----------------------------------------------------------------------
+# PENYIMPANAN DATA KE EXCEL
+# ----------------------------------------------------------------------
+def simpan_excel(df, path_output):
+    from openpyxl.styles import Font
+    from openpyxl.utils import get_column_letter
+    
+    # Jika file sudah ada, gabungkan data lama & baru, lalu bersihkan duplikat
+    if os.path.exists(path_output):
+        try:
+            df_lama = pd.read_excel(path_output)
+            df = pd.concat([df_lama, df], ignore_index=True)
+            df.drop_duplicates(subset=["Link"], keep="first", inplace=True)
+        except Exception as e:
+            print(f"Gagal membaca Excel lama ({path_output}): {e}")
+
+    with pd.ExcelWriter(path_output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Berita")
+        ws = writer.sheets["Berita"]
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+        for idx, col in enumerate(df.columns, start=1):
+            panjang = max([len(str(col))] + [len(str(v)) for v in df[col].astype(str).tolist()[:200]])
+            ws.column_dimensions[get_column_letter(idx)].width = min(max(panjang + 2, 10), 60)
+        ws.auto_filter.ref = ws.dimensions
+        ws.freeze_panes = "A2"
+
+# ----------------------------------------------------------------------
+# MAIN FUNCTION
+# ----------------------------------------------------------------------
+def main():
+    print("=== MULAI PENGAMBILAN BERITA AUTOMATIS (MAX PAGE = 3) ===\n")
+    semua_berita = []
+
+    # 1. Ambil RSS Feeds (Antara & Detik RSS)
+    print("1. Mengambil Feed RSS (ANTARA & Detik RSS)...")
+    for key, feed_info in FEEDS_RSS.items():
+        print(f"   - [{feed_info['media']}] Kanal '{feed_info['kategori']}'...", end=" ")
+        berita = ambil_rss(feed_info)
+        print(f"{len(berita)} berita")
+        semua_berita.extend(berita)
+        time.sleep(0.1)
+
+    # 2. Scraping Indeks Kanal Detikcom (Halaman 1 s/d 3)
+    print(f"\n2. Mengambil Indeks Kanal Detikcom (Halaman 1-{MAX_PAGE_INDEKS})...")
+    for k_detik in KANAL_INDEKS_DETIK:
+        print(f"   - [Detik] Indeks {k_detik['kategori']} ({k_detik['subdomain']}.detik.com)...", end=" ")
+        berita_detik = ambil_indeks_detik(k_detik['subdomain'], k_detik['kategori'], max_page=MAX_PAGE_INDEKS)
+        print(f"{len(berita_detik)} berita")
+        semua_berita.extend(berita_detik)
+        time.sleep(0.2)
+
+    # 3. Scraping Indeks Kompas.com (Halaman 1 s/d 3)
+    print(f"\n3. Mengambil Indeks Kompas.com (Halaman 1-{MAX_PAGE_INDEKS})...", end=" ")
+    kompas_berita = ambil_indeks_kompas(max_page=MAX_PAGE_INDEKS)
+    print(f"{len(kompas_berita)} berita")
+    semua_berita.extend(kompas_berita)
+
+    if not semua_berita:
+        print("\nTidak ada berita yang berhasil diambil.")
+        return
+
+    # Filter Duplikasi dalam runtime berjalan berdasarkan Link
+    df = pd.DataFrame(semua_berita)
+    df.drop_duplicates(subset=["Link"], keep="first", inplace=True)
+
+    # Parsing & Filter Umur Berita
+    df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(parse_tanggal)
+    now = datetime.now(timezone.utc)
+    batas_lama = now - timedelta(days=MAKS_UMUR_HARI)
+    
+    df = df[df["_tanggal_parsed"].notna()]
+    df = df[df["_tanggal_parsed"] >= batas_lama]
+
+    if df.empty:
+        print("\nTidak ada berita baru dalam rentang waktu yang ditentukan.")
+        return
+
+    df["Tanggal Terbit"] = df["_tanggal_parsed"].apply(format_tanggal_rfc2822)
+    df["_tanggal_file"] = df["_tanggal_parsed"].apply(lambda d: d.date().isoformat())
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+    print("\n4. Menyimpan & Menggabungkan Hasil ke File Excel...")
+    for tanggal_file, grup in df.groupby("_tanggal_file"):
+        grup_clean = grup.drop(columns=["_tanggal_parsed", "_tanggal_file"])
+        path_output = os.path.join(OUTPUT_FOLDER, f"{FILENAME_PREFIX}_{tanggal_file}.xlsx")
+        simpan_excel(grup_clean, path_output)
+        print(f"   - Update File: {path_output}")
+
+    # Update file index.json untuk UI viewer
+    daftar = [{"file": f, "tanggal": f.replace(f"{FILENAME_PREFIX}_", "").replace(".xlsx", "")}
+              for f in os.listdir(OUTPUT_FOLDER) if f.endswith(".xlsx")]
+    with open(os.path.join(OUTPUT_FOLDER, "index.json"), "w", encoding="utf-8") as f:
+        json.dump(daftar, f, ensure_ascii=False, indent=2)
+
+    print("\n=== PROSES SELESAI! DATA BERHASIL DIUPDATE KUMULATIF ===")
+
+if __name__ == "__main__":
+    main()
