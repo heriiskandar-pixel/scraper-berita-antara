@@ -2,8 +2,11 @@
 """
 scrape_berita_rss.py
 ====================
-Mengambil berita dari SELURUH RSS ANTARA News, Detik.com (RSS), dan Kompas.com (scraping).
-Menyimpan hasil ke file Excel per tanggal terbit dengan Kategori, Ringkasan & Gambar terisi.
+Skrip komprehensif penarik berita otomatis:
+- Menarik seluruh RSS Feed ANTARA News (17 Kanal) & RSS Detikcom.
+- Melakukan scraping halaman Indeks Kanal Detikcom (Inet, Oto, Health, Food, dll).
+- Melakukan scraping Kompas.com.
+- Menyimpan hasil ke file Excel per tanggal terbit beserta file index.json.
 """
 
 import os
@@ -29,9 +32,9 @@ HEADERS = {
 }
 
 # ----------------------------------------------------------------------
-# DAFTAR RSS FEEDS (SEMUA RSS ANTARA NEWS)
+# 1. DAFTAR RSS FEEDS (ANTARA NEWS & DETIK)
 # ----------------------------------------------------------------------
-FEEDS = {
+FEEDS_RSS = {
     # --- ANTARA NEWS (SELURUH KANAL) ---
     "antara-terkini":      {"url": "https://www.antaranews.com/rss/terkini.xml", "media": "Antara", "kategori": "Terkini"},
     "antara-top-news":     {"url": "https://www.antaranews.com/rss/top-news.xml", "media": "Antara", "kategori": "Top News"},
@@ -51,11 +54,27 @@ FEEDS = {
     "antara-warta-bumi":   {"url": "https://www.antaranews.com/rss/warta-bumi.xml", "media": "Antara", "kategori": "Warta Bumi"},
     "antara-foto":         {"url": "https://www.antaranews.com/rss/foto.xml", "media": "Antara", "kategori": "Foto"},
 
-    # --- DETIK.COM ---
+    # --- DETIK.COM (RSS) ---
     "detik-news":          {"url": "https://news.detik.com/rss", "media": "Detik", "kategori": "News"},
     "detik-finance":       {"url": "https://finance.detik.com/rss", "media": "Detik", "kategori": "Finance"},
     "detik-sport":         {"url": "https://sport.detik.com/rss", "media": "Detik", "kategori": "Sport"},
 }
+
+# ----------------------------------------------------------------------
+# 2. DAFTAR KANAL INDEKS DETIKCOM (NON-RSS)
+# ----------------------------------------------------------------------
+KANAL_INDEKS_DETIK = [
+    {"subdomain": "inet", "kategori": "Teknologi"},
+    {"subdomain": "hot", "kategori": "Hiburan"},
+    {"subdomain": "health", "kategori": "Kesehatan"},
+    {"subdomain": "food", "kategori": "Kuliner"},
+    {"subdomain": "travel", "kategori": "Wisata"},
+    {"subdomain": "oto", "kategori": "Otomotif"},
+    {"subdomain": "edu", "kategori": "Edukasi"},
+    {"subdomain": "hikmah", "kategori": "Hikmah"},
+    {"subdomain": "properti", "kategori": "Properti"},
+    {"subdomain": "wolipop", "kategori": "Gaya Hidup"},
+]
 
 # ----------------------------------------------------------------------
 # FUNGSI UTILITAS
@@ -83,10 +102,46 @@ def format_tanggal_rfc2822(dt):
         return ""
     return dt.strftime("%a, %d %b %Y %H:%M:%S %z")
 
+def ekstraksi_detail_halaman(url):
+    """Mengambil meta description, og:image, dan author dari halaman berita jika kosong"""
+    ringkasan = ""
+    url_gambar = ""
+    penulis = ""
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=5)
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text, 'lxml')
+            
+            # Ringkasan
+            meta_desc = soup.find('meta', attrs={'name': 'description'}) or \
+                        soup.find('meta', attrs={'property': 'og:description'})
+            if meta_desc and meta_desc.get('content'):
+                ringkasan = meta_desc['content'].strip()
+            else:
+                p_first = soup.find('p')
+                if p_first:
+                    ringkasan = p_first.get_text(strip=True)
+
+            # URL Gambar
+            meta_img = soup.find('meta', attrs={'property': 'og:image'}) or \
+                       soup.find('meta', attrs={'name': 'twitter:image'})
+            if meta_img and meta_img.get('content'):
+                url_gambar = meta_img['content'].strip()
+
+            # Penulis
+            meta_author = soup.find('meta', attrs={'name': 'author'})
+            if meta_author and meta_author.get('content'):
+                penulis = meta_author['content'].strip()
+    except Exception:
+        pass
+    return ringkasan, url_gambar, penulis
+
 # ----------------------------------------------------------------------
-# AMBIL RSS
+# EKSEKUTOR MODUL SCRAPING
 # ----------------------------------------------------------------------
+
 def ambil_rss(feed_info):
+    """Ekstraksi berita dari Feed RSS"""
     hasil = []
     try:
         resp = requests.get(feed_info["url"], headers=HEADERS, timeout=20)
@@ -104,25 +159,20 @@ def ambil_rss(feed_info):
             tanggal = (item.findtext("pubDate") or "").strip()
             raw_desc = item.findtext("description") or ""
             
-            # Kategori otomatis dari XML atau fallback ke topik kanal
             cat_xml = item.findtext("category")
             kategori_berita = cat_xml.strip().capitalize() if cat_xml and cat_xml.strip() else feed_info["kategori"]
 
-            # --- EKSTRAKSI URL GAMBAR ---
+            # Ekstraksi Gambar RSS
             url_gambar = ""
-            
-            # 1. Cek tag <enclosure url="...">
             enclosure = item.find("enclosure")
             if enclosure is not None and enclosure.get("url"):
                 url_gambar = enclosure.get("url")
             
-            # 2. Cek tag <media:content> atau <media:thumbnail>
             if not url_gambar:
                 media_content = item.find("media:content", namespaces) or item.find("media:thumbnail", namespaces)
                 if media_content is not None and media_content.get("url"):
                     url_gambar = media_content.get("url")
 
-            # 3. Ekstrak dari HTML <img> di dalam tag description
             if not url_gambar and raw_desc:
                 match_img = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', raw_desc, re.IGNORECASE)
                 if match_img:
@@ -144,10 +194,58 @@ def ambil_rss(feed_info):
         print(f"Gagal ambil RSS {feed_info['media']} ({feed_info['kategori']}): {e}")
     return hasil
 
-# ----------------------------------------------------------------------
-# SCRAPING KOMPAS.COM
-# ----------------------------------------------------------------------
+def ambil_indeks_detik(subdomain, kategori_nama, max_page=1):
+    """Scraping halaman Indeks Detikcom Non-RSS"""
+    hasil = []
+    tgl_now = datetime.now().strftime("%m/%d/%Y")
+    
+    for page in range(1, max_page + 1):
+        url = f"https://{subdomain}.detik.com/indeks/{page}?date={tgl_now}"
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=15)
+            if resp.status_code != 200:
+                break
+                
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            articles = soup.find_all('article')
+            
+            for art in articles:
+                tag_a = art.find('a', href=True)
+                if not tag_a:
+                    continue
+                    
+                link = tag_a['href']
+                tag_title = art.find('h3') or art.find('h2') or tag_a
+                judul = tag_title.get_text(strip=True) if tag_title else ""
+                
+                tag_img = art.find('img')
+                url_gambar = ""
+                if tag_img:
+                    url_gambar = tag_img.get('src') or tag_img.get('data-src') or ""
+
+                if len(judul) > 15:
+                    # Ambil ringkasan dari halaman detail
+                    ringkasan, img_detail, penulis = ekstraksi_detail_halaman(link)
+                    if not url_gambar:
+                        url_gambar = img_detail
+
+                    hasil.append({
+                        "Kategori": kategori_nama,
+                        "Judul": judul,
+                        "Tanggal Terbit": format_tanggal_rfc2822(datetime.now(timezone(timedelta(hours=7)))),
+                        "Penulis": penulis,
+                        "Ringkasan": ringkasan,
+                        "Link": link,
+                        "URL Gambar": url_gambar,
+                        "Media": "Detik"
+                    })
+        except Exception as e:
+            print(f"Gagal scraping indeks Detik [{subdomain}]: {e}")
+            
+    return hasil
+
 def ambil_kompas(max_artikel=30):
+    """Scraping Kompas.com"""
     hasil = []
     seen_links = set()
     urls = ["https://www.kompas.com/", "https://www.kompas.com/terpopuler"]
@@ -193,37 +291,7 @@ def ambil_kompas(max_artikel=30):
             else:
                 kategori = "General"
 
-            ringkasan = ""
-            url_gambar = ""
-            penulis = ""
-            try:
-                art_resp = requests.get(link, headers=HEADERS, timeout=5)
-                if art_resp.status_code == 200:
-                    art_soup = BeautifulSoup(art_resp.text, 'lxml')
-                    
-                    # Ringkasan
-                    meta_desc = art_soup.find('meta', attrs={'name': 'description'}) or \
-                                art_soup.find('meta', attrs={'property': 'og:description'})
-                    if meta_desc and meta_desc.get('content'):
-                        ringkasan = meta_desc['content'].strip()
-                    else:
-                        p_first = art_soup.find('p')
-                        if p_first:
-                            ringkasan = p_first.get_text(strip=True)
-
-                    # URL Gambar
-                    meta_img = art_soup.find('meta', attrs={'property': 'og:image'}) or \
-                               art_soup.find('meta', attrs={'name': 'twitter:image'})
-                    if meta_img and meta_img.get('content'):
-                        url_gambar = meta_img['content'].strip()
-
-                    # Penulis
-                    meta_author = art_soup.find('meta', attrs={'name': 'author'})
-                    if meta_author and meta_author.get('content'):
-                        penulis = meta_author['content'].strip()
-
-            except Exception:
-                pass
+            ringkasan, url_gambar, penulis = ekstraksi_detail_halaman(link)
 
             seen_links.add(link)
             hasil.append({
@@ -243,7 +311,7 @@ def ambil_kompas(max_artikel=30):
     return hasil
 
 # ----------------------------------------------------------------------
-# SIMPAN EXCEL
+# PENYIMPANAN DATA KE EXCEL
 # ----------------------------------------------------------------------
 def simpan_excel(df, path_output):
     from openpyxl.styles import Font
@@ -260,34 +328,46 @@ def simpan_excel(df, path_output):
         ws.freeze_panes = "A2"
 
 # ----------------------------------------------------------------------
-# MAIN
+# MAIN FUNCTION
 # ----------------------------------------------------------------------
 def main():
-    print("Mulai mengambil berita...\n")
+    print("=== MULAI PENGAMBILAN BERITA AUTOMATIS ===\n")
     semua_berita = []
 
-    for key, feed_info in FEEDS.items():
-        print(f"- Mengambil RSS [{feed_info['media']}] Kategori '{feed_info['kategori']}' ...", end=" ")
+    # 1. Ambil RSS Feeds (Antara & Detik RSS)
+    print("1. Mengambil Feed RSS (ANTARA & Detik RSS)...")
+    for key, feed_info in FEEDS_RSS.items():
+        print(f"   - [{feed_info['media']}] Kanal '{feed_info['kategori']}'...", end=" ")
         berita = ambil_rss(feed_info)
         print(f"{len(berita)} berita")
         semua_berita.extend(berita)
+        time.sleep(0.2)
+
+    # 2. Scraping Indeks Kanal Detikcom Tambahan (Non-RSS)
+    print("\n2. Mengambil Indeks Kanal Detikcom (Non-RSS)...")
+    for k_detik in KANAL_INDEKS_DETIK:
+        print(f"   - [Detik] Indeks {k_detik['kategori']} ({k_detik['subdomain']}.detik.com)...", end=" ")
+        berita_detik = ambil_indeks_detik(k_detik['subdomain'], k_detik['kategori'], max_page=1)
+        print(f"{len(berita_detik)} berita")
+        semua_berita.extend(berita_detik)
         time.sleep(0.3)
 
-    print("\n- Mengambil Kompas via scraping ...", end=" ")
+    # 3. Scraping Kompas.com
+    print("\n3. Mengambil Kompas.com via Scraping...", end=" ")
     kompas_berita = ambil_kompas(max_artikel=30)
     print(f"{len(kompas_berita)} berita")
     semua_berita.extend(kompas_berita)
 
     if not semua_berita:
-        print("Tidak ada berita yang berhasil diambil.")
+        print("\nTidak ada berita yang berhasil diambil.")
         return
 
-    # Hapus duplikasi berdasarkan link berita
+    # Filter Duplikasi berdasarkan Link
     df = pd.DataFrame(semua_berita)
     df.drop_duplicates(subset=["Link"], keep="first", inplace=True)
 
+    # Parsing & Filter Umur Berita
     df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(parse_tanggal)
-
     now = datetime.now(timezone.utc)
     batas_lama = now - timedelta(days=MAKS_UMUR_HARI)
     
@@ -295,25 +375,27 @@ def main():
     df = df[df["_tanggal_parsed"] >= batas_lama]
 
     if df.empty:
-        print("Tidak ada berita dalam rentang tanggal yang ditentukan.")
+        print("\nTidak ada berita baru dalam rentang waktu yang ditentukan.")
         return
 
     df["Tanggal Terbit"] = df["_tanggal_parsed"].apply(format_tanggal_rfc2822)
     df["_tanggal_file"] = df["_tanggal_parsed"].apply(lambda d: d.date().isoformat())
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+    print("\n4. Menyimpan Hasil ke File Excel...")
     for tanggal_file, grup in df.groupby("_tanggal_file"):
         grup_clean = grup.drop(columns=["_tanggal_parsed", "_tanggal_file"])
         path_output = os.path.join(OUTPUT_FOLDER, f"{FILENAME_PREFIX}_{tanggal_file}.xlsx")
         simpan_excel(grup_clean, path_output)
-        print(f"- {tanggal_file}: {len(grup_clean)} berita -> {path_output}")
+        print(f"   - File Terbuat: {path_output} ({len(grup_clean)} berita)")
 
+    # Buat file index.json untuk UI viewer
     daftar = [{"file": f, "tanggal": f.replace(f"{FILENAME_PREFIX}_", "").replace(".xlsx", "")}
               for f in os.listdir(OUTPUT_FOLDER) if f.endswith(".xlsx")]
     with open(os.path.join(OUTPUT_FOLDER, "index.json"), "w", encoding="utf-8") as f:
         json.dump(daftar, f, ensure_ascii=False, indent=2)
 
-    print("\nSelesai! Seluruh berita dari kanal ANTARA News berhasil disimpan.")
+    print("\n=== PROSES SELESAI! SEMUA DATA BERHASIL DIUPDATE ===")
 
 if __name__ == "__main__":
     main()
