@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Viewer Berita ANTARA</title>
+<title>Dashboard Analisis Berita & Sentimen AI</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
@@ -19,6 +19,7 @@
   .sub { color: #8b949e; font-size: 13px; margin-bottom: 16px; }
   h2 { font-size: 15px; margin: 0 0 10px; color: #c9d1d9; }
 
+  /* Kontrol & Filter */
   .kontrol {
     display: flex;
     gap: 12px;
@@ -34,11 +35,28 @@
     padding: 8px 12px;
     font-size: 14px;
   }
-  button {
-    cursor: pointer;
-  }
+  button { cursor: pointer; }
   button:hover { background: #21262d; }
+  button.aktif {
+    background: #1f6feb;
+    border-color: #58a6ff;
+    color: #ffffff;
+  }
   input[type="text"] { flex: 1; min-width: 200px; }
+
+  .group-view {
+    display: flex;
+    gap: 4px;
+    background: #161b22;
+    padding: 3px;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+  }
+  .group-view button {
+    border: none;
+    padding: 5px 10px;
+    font-size: 13px;
+  }
 
   #filter-aktif {
     display: flex;
@@ -70,78 +88,166 @@
 
   #status { color: #8b949e; font-size: 13px; margin-bottom: 12px; }
 
+  /* Grid Grafik */
   .grafik-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 16px;
     margin-bottom: 20px;
   }
-  @media (max-width: 800px) {
+  @media (max-width: 1000px) {
+    .grafik-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 650px) {
     .grafik-grid { grid-template-columns: 1fr; }
   }
+
   .kartu-grafik {
     background: #161b22;
     border: 1px solid #30363d;
     border-radius: 8px;
     padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
   }
-  .kartu-grafik canvas { max-height: 280px; cursor: pointer; }
+  .kartu-grafik canvas { max-height: 250px; cursor: pointer; }
   .petunjuk { color: #6e7681; font-size: 11px; margin-top: 6px; }
 
-  table {
-    border-collapse: collapse;
-    width: 100%;
-    font-size: 13px;
-  }
-  th, td {
-    border: 1px solid #30363d;
-    padding: 8px 10px;
-    text-align: left;
-    vertical-align: top;
-  }
-  th {
-    background: #161b22;
-    cursor: pointer;
-    user-select: none;
-    position: sticky;
-    top: 0;
-  }
+  /* Badge Sentimen */
+  .badge-pos { background: #238636; color: #ffffff; padding: 3px 8px; border-radius: 12px; font-weight: 600; font-size: 11px; display: inline-block; }
+  .badge-neg { background: #da3633; color: #ffffff; padding: 3px 8px; border-radius: 12px; font-weight: 600; font-size: 11px; display: inline-block; }
+  .badge-net { background: #484f58; color: #ffffff; padding: 3px 8px; border-radius: 12px; font-weight: 600; font-size: 11px; display: inline-block; }
+
+  /* Tampilan Tabel */
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid #30363d; padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #161b22; cursor: pointer; user-select: none; position: sticky; top: 0; }
   th:hover { background: #21262d; }
   tr:nth-child(even) { background: #10151c; }
-  a { color: #58a6ff; }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
   .panah { opacity: 0.5; font-size: 11px; }
   #tabel-wrap { overflow-x: auto; max-height: 65vh; overflow-y: auto; }
-  td img {
-    width: 160px;
-    height: auto;
+  td img { width: 140px; height: auto; border-radius: 6px; display: block; }
+
+  /* Tampilan Kartu (Card View) */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    max-height: 65vh;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .news-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .news-card img {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
     border-radius: 6px;
-    display: block;
+    margin-bottom: 10px;
+  }
+  .news-card .card-meta {
+    font-size: 11px;
+    color: #8b949e;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .news-card .card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e6edf3;
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+  .news-card .card-desc {
+    font-size: 12px;
+    color: #8b949e;
+    margin-bottom: 12px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .news-card .card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid #21262d;
   }
 </style>
 </head>
 <body>
 
-<h1>📰 Viewer Berita ANTARA News</h1>
-<div class="sub">Klik salah satu batang di grafik untuk memfilter tabel dan grafik lainnya.</div>
+<h1>📰 Dashboard Analisis Berita & Sentimen AI</h1>
+<div class="sub">Klik elemen pada grafik atau gunakan opsi filter untuk menyaring data secara interaktif.</div>
 
 <div class="grafik-grid">
   <div class="kartu-grafik">
     <h2>Jumlah Berita per Hari</h2>
     <canvas id="grafik-per-hari"></canvas>
-    <div class="petunjuk">Klik batang untuk filter ke tanggal itu. Klik lagi untuk batalkan.</div>
+    <div class="petunjuk">Klik batang untuk memfilter tanggal.</div>
   </div>
   <div class="kartu-grafik">
-    <h2>Jumlah Berita per Kategori</h2>
+    <h2>Sentimen AI (IndoBERT)</h2>
+    <canvas id="grafik-sentimen"></canvas>
+    <div class="petunjuk">Klik segmen untuk memfilter sentimen.</div>
+  </div>
+  <div class="kartu-grafik">
+    <h2>Top Kategori Berita</h2>
     <canvas id="grafik-per-kategori"></canvas>
-    <div class="petunjuk">Klik batang untuk filter ke kategori itu. Klik lagi untuk batalkan.</div>
+    <div class="petunjuk">Klik batang untuk memfilter kategori.</div>
   </div>
 </div>
 
 <div class="kontrol">
-  <label for="pilih-tanggal">Tanggal:</label>
-  <select id="pilih-tanggal"></select>
-  <input type="text" id="cari" placeholder="Cari judul, kategori, dll...">
-  <button id="reset-filter">Reset semua filter</button>
+  <!-- Filter Tanggal -->
+  <select id="pilih-tanggal">
+    <option value="">Semua Tanggal</option>
+  </select>
+  
+  <!-- Filter Media -->
+  <select id="pilih-media">
+    <option value="">Semua Media</option>
+  </select>
+
+  <!-- Filter Sentimen -->
+  <select id="pilih-sentimen">
+    <option value="">Semua Sentimen</option>
+    <option value="Positif">Positif</option>
+    <option value="Netral">Netral</option>
+    <option value="Negatif">Negatif</option>
+  </select>
+
+  <!-- Filter Kategori -->
+  <select id="pilih-kategori">
+    <option value="">Semua Kategori</option>
+  </select>
+
+  <!-- Pencarian Bebas -->
+  <input type="text" id="cari" placeholder="Cari kata kunci...">
+
+  <!-- Switch Mode View -->
+  <div class="group-view">
+    <button id="btn-view-table" class="aktif" title="Tampilan Tabel">📋 Tabel</button>
+    <button id="btn-view-card" title="Tampilan Kartu">🎴 Kartu</button>
+  </div>
+
+  <button id="reset-filter">Reset Filter</button>
 </div>
 
 <div id="filter-aktif"></div>
@@ -149,24 +255,37 @@
 <div id="tabel-wrap"></div>
 
 <script>
-let semuaData = [];        // gabungan semua baris dari semua file, tiap baris punya _tanggalFile
-let filterTanggal = null;  // null = semua tanggal
-let filterKategori = null; // null = semua kategori
+let semuaData = [];        
+let filterTanggal = null;  
+let filterKategori = null; 
+let filterSentimen = null; 
+let filterMedia = null;
+let modeView = 'table'; // 'table' atau 'card'
+
 let kolomUrut = null;
 let arahUrut = 1;
+
 let chartHari = null;
 let chartKategori = null;
+let chartSentimen = null;
 
 const elPilihTanggal = document.getElementById('pilih-tanggal');
+const elPilihMedia = document.getElementById('pilih-media');
+const elPilihSentimen = document.getElementById('pilih-sentimen');
+const elPilihKategori = document.getElementById('pilih-kategori');
 const elCari = document.getElementById('cari');
 const elStatus = document.getElementById('status');
 const elTabelWrap = document.getElementById('tabel-wrap');
 const elFilterAktif = document.getElementById('filter-aktif');
 const elResetFilter = document.getElementById('reset-filter');
 
+const btnViewTable = document.getElementById('btn-view-table');
+const btnViewCard = document.getElementById('btn-view-card');
+
 const WARNA_NORMAL = '#30363d';
 const WARNA_AKTIF = '#58a6ff';
 const OPSI_WARNA = ['#58a6ff', '#3fb950', '#f0883e', '#db61a2', '#a371f7', '#e3b341', '#79c0ff', '#56d364'];
+const WARNA_SENTIMEN = { 'Positif': '#238636', 'Negatif': '#da3633', 'Netral': '#8b949e' };
 
 // ---------- MUAT DATA ----------
 
@@ -174,14 +293,14 @@ async function muatSemuaData() {
   try {
     const res = await fetch('data/index.json?_=' + Date.now());
     if (!res.ok) throw new Error('index.json tidak ditemukan');
-    const daftar = await res.json();  // [{file, tanggal, jumlah}, ...]
+    const daftar = await res.json();  
 
     if (daftar.length === 0) {
       elStatus.textContent = 'Belum ada file berita tersedia.';
       return;
     }
 
-    elPilihTanggal.innerHTML = '<option value="">Semua tanggal</option>' +
+    elPilihTanggal.innerHTML = '<option value="">Semua Tanggal</option>' +
       daftar.map(d => `<option value="${d.tanggal}">${d.tanggal}</option>`).join('');
 
     elStatus.textContent = `Memuat ${daftar.length} file...`;
@@ -201,10 +320,29 @@ async function muatSemuaData() {
     }));
 
     semuaData = hasil.flat();
+
+    populateFilterOptions();
     renderSemua();
   } catch (e) {
     elStatus.textContent = 'Gagal memuat data: ' + e.message;
   }
+}
+
+// Populate Opsi Dropdown Kategori & Media Dinamis dari Data
+function populateFilterOptions() {
+  const mediaSet = new Set();
+  const kategoriSet = new Set();
+
+  semuaData.forEach(b => {
+    if (b['Media']) mediaSet.add(String(b['Media']).trim());
+    pecahKategori(b).forEach(k => kategoriSet.add(k));
+  });
+
+  elPilihMedia.innerHTML = '<option value="">Semua Media</option>' +
+    Array.from(mediaSet).sort().map(m => `<option value="${m}">${m}</option>`).join('');
+
+  elPilihKategori.innerHTML = '<option value="">Semua Kategori</option>' +
+    Array.from(kategoriSet).sort().map(k => `<option value="${k}">${k}</option>`).join('');
 }
 
 // ---------- FUNGSI FILTER ----------
@@ -226,27 +364,20 @@ function dataTersaring() {
     if (!cocokPencarian(b, kataKunci)) return false;
     if (filterTanggal && b._tanggalFile !== filterTanggal) return false;
     if (filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
+    if (filterSentimen && String(b['Sentimen'] ?? '').trim() !== filterSentimen) return false;
+    if (filterMedia && String(b['Media'] ?? '').trim() !== filterMedia) return false;
     return true;
   });
 }
 
-// Data untuk grafik per-hari: ikut filter kategori & pencarian, TAPI TIDAK ikut filter tanggal
-// (supaya grafik ini tetap menampilkan semua hari sebagai pilihan)
-function dataUntukGrafikHari() {
+function dataAbaikanFilter(field) {
   const kataKunci = elCari.value.trim().toLowerCase();
   return semuaData.filter(b => {
     if (!cocokPencarian(b, kataKunci)) return false;
-    if (filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
-    return true;
-  });
-}
-
-// Data untuk grafik per-kategori: ikut filter tanggal & pencarian, TAPI TIDAK ikut filter kategori
-function dataUntukGrafikKategori() {
-  const kataKunci = elCari.value.trim().toLowerCase();
-  return semuaData.filter(b => {
-    if (!cocokPencarian(b, kataKunci)) return false;
-    if (filterTanggal && b._tanggalFile !== filterTanggal) return false;
+    if (field !== 'tanggal' && filterTanggal && b._tanggalFile !== filterTanggal) return false;
+    if (field !== 'kategori' && filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
+    if (field !== 'sentimen' && filterSentimen && String(b['Sentimen'] ?? '').trim() !== filterSentimen) return false;
+    if (field !== 'media' && filterMedia && String(b['Media'] ?? '').trim() !== filterMedia) return false;
     return true;
   });
 }
@@ -254,7 +385,7 @@ function dataUntukGrafikKategori() {
 // ---------- RENDER GRAFIK ----------
 
 function renderGrafikPerHari() {
-  const data = dataUntukGrafikHari();
+  const data = dataAbaikanFilter('tanggal');
   const hitung = {};
   for (const b of data) {
     hitung[b._tanggalFile] = (hitung[b._tanggalFile] || 0) + 1;
@@ -280,8 +411,8 @@ function renderGrafikPerHari() {
       },
       onClick: (evt, elemen) => {
         if (elemen.length === 0) return;
-        const tanggalDiklik = label[elemen[0].index];
-        filterTanggal = (filterTanggal === tanggalDiklik) ? null : tanggalDiklik;
+        const tgl = label[elemen[0].index];
+        filterTanggal = (filterTanggal === tgl) ? null : tgl;
         elPilihTanggal.value = filterTanggal || '';
         renderSemua();
       }
@@ -289,15 +420,56 @@ function renderGrafikPerHari() {
   });
 }
 
+function renderGrafikSentimen() {
+  const data = dataAbaikanFilter('sentimen');
+  const hitung = { 'Positif': 0, 'Netral': 0, 'Negatif': 0 };
+  
+  for (const b of data) {
+    const s = String(b['Sentimen'] || 'Netral').trim();
+    if (hitung[s] !== undefined) hitung[s]++;
+    else hitung['Netral']++;
+  }
+
+  const label = Object.keys(hitung);
+  const nilai = Object.values(hitung);
+  const bgWarna = label.map(l => {
+    if (filterSentimen) return l === filterSentimen ? WARNA_SENTIMEN[l] : WARNA_NORMAL;
+    return WARNA_SENTIMEN[l];
+  });
+
+  const ctx = document.getElementById('grafik-sentimen');
+  if (chartSentimen) chartSentimen.destroy();
+  chartSentimen = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: label,
+      datasets: [{ data: nilai, backgroundColor: bgWarna, borderWidth: 1, borderColor: '#161b22' }]
+    },
+    options: {
+      responsive: true,
+      plugins: { 
+        legend: { labels: { color: '#c9d1d9', font: { size: 11 } } }
+      },
+      onClick: (evt, elemen) => {
+        if (elemen.length === 0) return;
+        const sentimenDiklik = label[elemen[0].index];
+        filterSentimen = (filterSentimen === sentimenDiklik) ? null : sentimenDiklik;
+        elPilihSentimen.value = filterSentimen || '';
+        renderSemua();
+      }
+    }
+  });
+}
+
 function renderGrafikPerKategori() {
-  const data = dataUntukGrafikKategori();
+  const data = dataAbaikanFilter('kategori');
   const hitung = {};
   for (const b of data) {
     for (const k of pecahKategori(b)) {
       hitung[k] = (hitung[k] || 0) + 1;
     }
   }
-  const entri = Object.entries(hitung).sort((a, b) => b[1] - a[1]);
+  const entri = Object.entries(hitung).sort((a, b) => b[1] - a[1]).slice(0, 10);
   const label = entri.map(e => e[0]);
   const nilai = entri.map(e => e[1]);
   const warna = label.map((l, i) => {
@@ -323,20 +495,27 @@ function renderGrafikPerKategori() {
       },
       onClick: (evt, elemen) => {
         if (elemen.length === 0) return;
-        const kategoriDiklik = label[elemen[0].index];
-        filterKategori = (filterKategori === kategoriDiklik) ? null : kategoriDiklik;
+        const kateg = label[elemen[0].index];
+        filterKategori = (filterKategori === kateg) ? null : kateg;
+        elPilihKategori.value = filterKategori || '';
         renderSemua();
       }
     }
   });
 }
 
-// ---------- RENDER CHIP FILTER AKTIF ----------
+// ---------- CHIP FILTER ----------
 
 function renderChipFilter() {
   const chip = [];
   if (filterTanggal) {
     chip.push(`<span class="chip">Tanggal: ${filterTanggal} <button onclick="hapusFilterTanggal()">✕</button></span>`);
+  }
+  if (filterMedia) {
+    chip.push(`<span class="chip">Media: ${filterMedia} <button onclick="hapusFilterMedia()">✕</button></span>`);
+  }
+  if (filterSentimen) {
+    chip.push(`<span class="chip">Sentimen: ${filterSentimen} <button onclick="hapusFilterSentimen()">✕</button></span>`);
   }
   if (filterKategori) {
     chip.push(`<span class="chip">Kategori: ${filterKategori} <button onclick="hapusFilterKategori()">✕</button></span>`);
@@ -344,19 +523,14 @@ function renderChipFilter() {
   elFilterAktif.innerHTML = chip.join('');
 }
 
-function hapusFilterTanggal() {
-  filterTanggal = null;
-  elPilihTanggal.value = '';
-  renderSemua();
-}
-function hapusFilterKategori() {
-  filterKategori = null;
-  renderSemua();
-}
+function hapusFilterTanggal() { filterTanggal = null; elPilihTanggal.value = ''; renderSemua(); }
+function hapusFilterMedia() { filterMedia = null; elPilihMedia.value = ''; renderSemua(); }
+function hapusFilterSentimen() { filterSentimen = null; elPilihSentimen.value = ''; renderSemua(); }
+function hapusFilterKategori() { filterKategori = null; elPilihKategori.value = ''; renderSemua(); }
 
-// ---------- RENDER TABEL ----------
+// ---------- RENDER TAMPILAN (TABEL ATAU KARTU) ----------
 
-function renderTabel() {
+function renderTampilanUtama() {
   let data = dataTersaring();
 
   if (kolomUrut) {
@@ -374,6 +548,15 @@ function renderTabel() {
     return;
   }
 
+  if (modeView === 'table') {
+    renderTabel(data);
+  } else {
+    renderKartu(data);
+  }
+}
+
+// Render Model Tabel
+function renderTabel(data) {
   const kolom = Object.keys(semuaData[0]).filter(k => k !== '_tanggalFile');
 
   let html = '<table><thead><tr>';
@@ -389,9 +572,14 @@ function renderTabel() {
     for (const k of kolom) {
       let nilai = baris[k];
       if (k === 'Link' && nilai) {
-        html += `<td><a href="${nilai}" target="_blank" rel="noopener">buka</a></td>`;
+        html += `<td><a href="${nilai}" target="_blank" rel="noopener">Buka</a></td>`;
       } else if (k === 'URL Gambar' && nilai) {
-        html += `<td><a href="${nilai}" target="_blank" rel="noopener"><img src="${nilai}" loading="lazy" alt="gambar berita"></a></td>`;
+        html += `<td><a href="${nilai}" target="_blank" rel="noopener"><img src="${nilai}" loading="lazy" alt="gambar"></a></td>`;
+      } else if (k === 'Sentimen') {
+        let cls = 'badge-net';
+        if (nilai === 'Positif') cls = 'badge-pos';
+        else if (nilai === 'Negatif') cls = 'badge-neg';
+        html += `<td><span class="${cls}">${nilai}</span></td>`;
       } else {
         html += `<td>${String(nilai ?? '')}</td>`;
       }
@@ -410,31 +598,105 @@ function renderTabel() {
         kolomUrut = k;
         arahUrut = 1;
       }
-      renderTabel();
+      renderTampilanUtama();
     });
   });
 }
 
-// ---------- RENDER SEMUA (dipanggil tiap kali ada perubahan filter) ----------
+// Render Model Kartu (Card View)
+function renderKartu(data) {
+  let html = '<div class="card-grid">';
+
+  for (const baris of data) {
+    const judul = baris['Judul'] || 'Tanpa Judul';
+    const media = baris['Media'] || 'News';
+    const tanggal = baris['Tanggal'] || baris._tanggalFile || '';
+    const gambar = baris['URL Gambar'] || '';
+    const ringkasan = baris['Ringkasan'] || baris['Isi'] || '';
+    const sentimen = baris['Sentimen'] || 'Netral';
+    const link = baris['Link'] || '#';
+
+    let cls = 'badge-net';
+    if (sentimen === 'Positif') cls = 'badge-pos';
+    else if (sentimen === 'Negatif') cls = 'badge-neg';
+
+    html += `
+      <div class="news-card">
+        <div>
+          ${gambar ? `<img src="${gambar}" loading="lazy" alt="gambar berita">` : ''}
+          <div class="card-meta">
+            <span><strong>${media}</strong> • ${tanggal}</span>
+            <span class="${cls}">${sentimen}</span>
+          </div>
+          <div class="card-title">${judul}</div>
+          ${ringkasan ? `<div class="card-desc">${ringkasan}</div>` : ''}
+        </div>
+        <div class="card-footer">
+          <span style="font-size:11px; color:#8b949e;">${baris['Kategori'] || ''}</span>
+          <a href="${link}" target="_blank" rel="noopener" style="font-weight:600; font-size:12px;">Baca Selengkapnya →</a>
+        </div>
+      </div>
+    `;
+  }
+  html += '</div>';
+  elTabelWrap.innerHTML = html;
+}
+
+// ---------- RENDER UTAMA ----------
 
 function renderSemua() {
   renderChipFilter();
   renderGrafikPerHari();
+  renderGrafikSentimen();
   renderGrafikPerKategori();
-  renderTabel();
+  renderTampilanUtama();
 }
 
-// ---------- EVENT ----------
+// ---------- EVENT LISTENER ----------
 
 elPilihTanggal.addEventListener('change', () => {
   filterTanggal = elPilihTanggal.value || null;
   renderSemua();
 });
+elPilihMedia.addEventListener('change', () => {
+  filterMedia = elPilihMedia.value || null;
+  renderSemua();
+});
+elPilihSentimen.addEventListener('change', () => {
+  filterSentimen = elPilihSentimen.value || null;
+  renderSemua();
+});
+elPilihKategori.addEventListener('change', () => {
+  filterKategori = elPilihKategori.value || null;
+  renderSemua();
+});
+
 elCari.addEventListener('input', renderSemua);
+
+// Switch View Event
+btnViewTable.addEventListener('click', () => {
+  modeView = 'table';
+  btnViewTable.classList.add('aktif');
+  btnViewCard.classList.remove('aktif');
+  renderTampilanUtama();
+});
+
+btnViewCard.addEventListener('click', () => {
+  modeView = 'card';
+  btnViewCard.classList.add('aktif');
+  btnViewTable.classList.remove('aktif');
+  renderTampilanUtama();
+});
+
 elResetFilter.addEventListener('click', () => {
   filterTanggal = null;
   filterKategori = null;
+  filterSentimen = null;
+  filterMedia = null;
   elPilihTanggal.value = '';
+  elPilihMedia.value = '';
+  elPilihSentimen.value = '';
+  elPilihKategori.value = '';
   elCari.value = '';
   renderSemua();
 });
