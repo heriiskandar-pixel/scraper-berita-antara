@@ -2,7 +2,6 @@
 """
 scrape_berita_rss.py
 ====================
-
 Mengambil berita dari ANTARA News (RSS), Detik.com (RSS), dan Kompas.com (scraping ringan).
 Menyimpan hasil ke file Excel per tanggal terbit.
 """
@@ -116,6 +115,11 @@ def ambil_kompas(max_artikel=30):
                 meta_time = artikel_soup.find('meta', attrs={'name':'publishdate'})
                 if meta_time and meta_time.get('content'):
                     tanggal = meta_time['content']
+                else:
+                    # fallback: cari elemen read__time
+                    date_div = artikel_soup.find(['div','span'], class_=re.compile(r'read__time|date'))
+                    if date_div:
+                        tanggal = date_div.get_text(strip=True)
             except Exception as e:
                 print(f"Gagal ambil tanggal dari {link}: {e}")
 
@@ -175,10 +179,13 @@ def main():
 
     df = pd.DataFrame(semua_berita)
     df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(parse_tanggal)
-    now = datetime.now()
+
+    # Perbaikan timezone
+    now = datetime.now().astimezone()
     batas_lama = now - timedelta(days=MAKS_UMUR_HARI)
+    df["_tanggal_parsed"] = df["_tanggal_parsed"].apply(lambda d: d.replace(tzinfo=None) if d and d.tzinfo else d)
     df = df[df["_tanggal_parsed"].notna()]
-    df = df[df["_tanggal_parsed"] >= batas_lama]
+    df = df[df["_tanggal_parsed"] >= batas_lama.replace(tzinfo=None)]
 
     df["_tanggal_file"] = df["_tanggal_parsed"].apply(lambda d: d.date().isoformat())
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
