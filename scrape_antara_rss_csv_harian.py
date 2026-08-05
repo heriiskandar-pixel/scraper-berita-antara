@@ -3,7 +3,7 @@
 scrape_berita_rss.py
 ====================
 Mengambil berita dari ANTARA News (RSS), Detik.com (RSS), dan Kompas.com (scraping).
-Menyimpan hasil ke file Excel per tanggal terbit dengan Ringkasan terisi.
+Menyimpan hasil ke file Excel per tanggal terbit dengan Ringkasan & URL Gambar terisi.
 """
 
 import os
@@ -71,14 +71,44 @@ def ambil_rss(feed_info):
         resp = requests.get(feed_info["url"], headers=HEADERS, timeout=20)
         resp.raise_for_status()
         root = ET.fromstring(resp.content)
+        
+        # Namespace XML untuk menangani tag media:content / media:thumbnail
+        namespaces = {
+            'media': 'http://search.yahoo.com/mrss/',
+            'content': 'http://purl.org/rss/1.0/modules/content/'
+        }
+
         for item in root.findall(".//item"):
             judul = (item.findtext("title") or "").strip()
             link = (item.findtext("link") or "").strip()
             tanggal = (item.findtext("pubDate") or "").strip()
-            deskripsi = clean_html(item.findtext("description") or "")
+            raw_desc = item.findtext("description") or ""
             
             cat_xml = item.findtext("category")
             kategori_berita = cat_xml.strip().capitalize() if cat_xml else feed_info["kategori"]
+
+            # --- EKSTRAKSI URL GAMBAR ---
+            url_gambar = ""
+            
+            # 1. Cek tag <enclosure url="...">
+            enclosure = item.find("enclosure")
+            if enclosure is not None and enclosure.get("url"):
+                url_gambar = enclosure.get("url")
+            
+            # 2. Cek tag <media:content> atau <media:thumbnail>
+            if not url_gambar:
+                media_content = item.find("media:content", namespaces) or item.find("media:thumbnail", namespaces)
+                if media_content is not None and media_content.get("url"):
+                    url_gambar = media_content.get("url")
+
+            # 3. Ekstrak dari HTML <img> di dalam description
+            if not url_gambar and raw_desc:
+                match_img = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', raw_desc, re.IGNORECASE)
+                if match_img:
+                    url_gambar = match_img.group(1)
+
+            # Clean description untuk ringkasan teks
+            deskripsi = clean_html(raw_desc)
 
             hasil.append({
                 "Kategori": kategori_berita,
@@ -87,7 +117,7 @@ def ambil_rss(feed_info):
                 "Penulis": "",
                 "Ringkasan": deskripsi,
                 "Link": link,
-                "URL Gambar": "",
+                "URL Gambar": url_gambar,
                 "Media": feed_info["media"]
             })
     except Exception as e:
@@ -95,7 +125,7 @@ def ambil_rss(feed_info):
     return hasil
 
 # ----------------------------------------------------------------------
-# SCRAPING KOMPAS.COM (DENGAN EKSTRAKSI RINGKASAN)
+# SCRAPING KOMPAS.COM
 # ----------------------------------------------------------------------
 def ambil_kompas(max_artikel=30):
     hasil = []
@@ -145,34 +175,48 @@ def ambil_kompas(max_artikel=30):
             else:
                 kategori = "General"
 
-            # AMBIL RINGKASAN (DESKRIPSI) DARI HALAMAN ARTIKEL
+            # EKSTRAKSI DETAIL ARTIKEL (RINGKASAN, GAMBAR, PENULIS)
             ringkasan = ""
+            url_gambar = ""
+            penulis = ""
             try:
                 art_resp = requests.get(link, headers=HEADERS, timeout=5)
                 if art_resp.status_code == 200:
                     art_soup = BeautifulSoup(art_resp.text, 'lxml')
-                    # Prioritas 1: Ambil dari meta description
+                    
+                    # 1. Ringkasan
                     meta_desc = art_soup.find('meta', attrs={'name': 'description'}) or \
                                 art_soup.find('meta', attrs={'property': 'og:description'})
                     if meta_desc and meta_desc.get('content'):
                         ringkasan = meta_desc['content'].strip()
                     else:
-                        # Prioritas 2: Paragraf pertama artikel
                         p_first = art_soup.find('p')
                         if p_first:
                             ringkasan = p_first.get_text(strip=True)
+
+                    # 2. URL Gambar
+                    meta_img = art_soup.find('meta', attrs={'property': 'og:image'}) or \
+                               art_soup.find('meta', attrs={'name': 'twitter:image'})
+                    if meta_img and meta_img.get('content'):
+                        url_gambar = meta_img['content'].strip()
+
+                    # 3. Penulis
+                    meta_author = art_soup.find('meta', attrs={'name': 'author'})
+                    if meta_author and meta_author.get('content'):
+                        penulis = meta_author['content'].strip()
+
             except Exception:
-                pass  # Jika gagal, ringkasan tetap kosong tanpa menghentikan program
+                pass
 
             seen_links.add(link)
             hasil.append({
                 "Kategori": kategori,
                 "Judul": judul,
                 "Tanggal Terbit": tanggal,
-                "Penulis": "",
+                "Penulis": penulis,
                 "Ringkasan": ringkasan,
                 "Link": link,
-                "URL Gambar": "",
+                "URL Gambar": url_gambar,
                 "Media": "Kompas"
             })
 
