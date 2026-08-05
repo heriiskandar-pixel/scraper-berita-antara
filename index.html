@@ -174,6 +174,7 @@
     .grafik-grid { grid-template-columns: 1fr; }
   }
 
+  /* PERBAIKAN TATA LETAK KARTU GRAFIK & KONTEN */
   .kartu-grafik {
     background: #161b22;
     border: 1px solid #30363d;
@@ -181,16 +182,20 @@
     padding: 16px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: flex-start;
   }
   .kartu-grafik h2 { font-size: 14px; margin: 0 0 10px; color: #c9d1d9; }
+  
+  /* PERBAIKAN TINGGI KONTEN CHART AGAR TIDAK MELUAP */
   .chart-container {
     position: relative;
     width: 100%;
-    height: 220px;
+    min-height: 220px;
+    height: auto;
+    flex: 1;
   }
   .kartu-grafik canvas { cursor: pointer; }
-  .petunjuk { color: #6e7681; font-size: 11px; margin-top: 6px; }
+  .petunjuk { color: #6e7681; font-size: 11px; margin-top: 10px; }
 
   /* Badge Sentimen */
   .badge-pos { background: #238636; color: #ffffff; padding: 3px 8px; border-radius: 12px; font-weight: 600; font-size: 11px; display: inline-block; }
@@ -283,7 +288,7 @@
     </div>
   </div>
 
-  <!-- Ringkasan KPI Cards (Jumlah Berita, Jumlah Media, Jumlah Kategori) -->
+  <!-- Ringkasan KPI Cards (3 Kolom) -->
   <div class="kpi-grid">
     <div class="kpi-card">
       <div class="kpi-title">Jumlah Berita</div>
@@ -572,7 +577,7 @@ function renderKPICards(data) {
   document.getElementById('kpi-kategori-sub').textContent = `Kategori topik unik`;
 }
 
-// ---------- RENDER GRAFIK (BAR HORIZONTAL & MENAMPILKAN SEMUA DATA) ----------
+// ---------- RENDER GRAFIK ----------
 
 function renderGrafikPerHari() {
   const data = dataAbaikanFilter('tanggal');
@@ -672,8 +677,8 @@ function renderGrafikKategori() {
     }
   }
 
-  // Tampilkan SEMUA data kategori tanpa dipotong slice
-  const sortedKat = Object.entries(hitung).sort((a, b) => b[1] - a[1]);
+  // Menampilkan 10 Kategori terbanyak agar layout tetap rapi
+  const sortedKat = Object.entries(hitung).sort((a, b) => b[1] - a[1]).slice(0, 10);
   const label = sortedKat.map(item => item[0]);
   const nilai = sortedKat.map(item => item[1]);
   const warna = label.map(l => l === filterKategori ? WARNA_AKTIF : WARNA_NORMAL);
@@ -715,8 +720,8 @@ function renderGrafikMedia() {
     hitung[m] = (hitung[m] || 0) + 1;
   }
 
-  // Tampilkan SEMUA data media
-  const sortedMedia = Object.entries(hitung).sort((a, b) => b[1] - a[1]);
+  // Menampilkan 10 Media terbanyak agar layout tetap rapi & grafik tidak keluar
+  const sortedMedia = Object.entries(hitung).sort((a, b) => b[1] - a[1]).slice(0, 10);
   const label = sortedMedia.map(item => item[0]);
   const nilai = sortedMedia.map(item => item[1]);
   const warna = label.map(l => l === filterMedia ? WARNA_AKTIF : WARNA_NORMAL);
