@@ -1,52 +1,66 @@
 [
   {
-    "file": "berita_antara_2034-08-05.xlsx",
-    "tanggal": "2034-08-05",
-    "jumlah": 1
-  },
-  {
     "file": "berita_antara_2026-08-05.xlsx",
-    "tanggal": "2026-08-05",
-    "jumlah": 216
+    "tanggal": "antara_2026-08-05"
   },
   {
-    "file": "berita_antara_2026-08-04.xlsx",
-    "tanggal": "2026-08-04",
-    "jumlah": 832
+    "file": "berita_2026-07-31.xlsx",
+    "tanggal": "2026-07-31"
   },
   {
-    "file": "berita_antara_2026-08-03.xlsx",
-    "tanggal": "2026-08-03",
-    "jumlah": 415
+    "file": "berita_2026-08-05.xlsx",
+    "tanggal": "2026-08-05"
   },
   {
-    "file": "berita_antara_2026-08-02.xlsx",
-    "tanggal": "2026-08-02",
-    "jumlah": 37
-  },
-  {
-    "file": "berita_antara_2026-08-01.xlsx",
-    "tanggal": "2026-08-01",
-    "jumlah": 21
-  },
-  {
-    "file": "berita_antara_2026-07-31.xlsx",
-    "tanggal": "2026-07-31",
-    "jumlah": 26
-  },
-  {
-    "file": "berita_antara_2026-07-30.xlsx",
-    "tanggal": "2026-07-30",
-    "jumlah": 10
-  },
-  {
-    "file": "berita_antara_2026-07-29.xlsx",
-    "tanggal": "2026-07-29",
-    "jumlah": 15
+    "file": "berita_2026-07-30.xlsx",
+    "tanggal": "2026-07-30"
   },
   {
     "file": "berita_antara_2026-07-28.xlsx",
-    "tanggal": "2026-07-28",
-    "jumlah": 10
+    "tanggal": "antara_2026-07-28"
+  },
+  {
+    "file": "berita_antara_2026-07-30.xlsx",
+    "tanggal": "antara_2026-07-30"
+  },
+  {
+    "file": "berita_antara_2026-08-03.xlsx",
+    "tanggal": "antara_2026-08-03"
+  },
+  {
+    "file": "berita_antara_2026-08-02.xlsx",
+    "tanggal": "antara_2026-08-02"
+  },
+  {
+    "file": "berita_antara_2026-08-01.xlsx",
+    "tanggal": "antara_2026-08-01"
+  },
+  {
+    "file": "berita_antara_2026-08-04.xlsx",
+    "tanggal": "antara_2026-08-04"
+  },
+  {
+    "file": "berita_2026-08-03.xlsx",
+    "tanggal": "2026-08-03"
+  },
+  {
+    "file": "berita_antara_2026-07-29.xlsx",
+    "tanggal": "antara_2026-07-29"
+  },
+  {
+    "file": "berita_2026-08-04.xlsx",
+    "tanggal": "2026-08-04"
+  },
+  {
+    "file": "berita_antara_2034-08-05.xlsx",
+    "tanggal": "antara_2034-08-05"
+  },
+  {
+    "file": "berita_2026-08-02.xlsx",
+    "tanggal": "2026-08-02"
+  },
+  {
+    "file": "berita_antara_2026-07-31.xlsx",
+    "tanggal": "antara_2026-07-31"
   }
 ]
