@@ -160,7 +160,7 @@
 
   #status { color: #8b949e; font-size: 13px; margin-bottom: 12px; }
 
-  /* Grid Grafik & Word Cloud (4 Bar Chart Grid) */
+  /* Grid Grafik (4 Horizontal Bar Chart Grid) */
   .grafik-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -184,36 +184,13 @@
     justify-content: space-between;
   }
   .kartu-grafik h2 { font-size: 14px; margin: 0 0 10px; color: #c9d1d9; }
-  .kartu-grafik canvas { max-height: 220px; cursor: pointer; }
+  .chart-container {
+    position: relative;
+    width: 100%;
+    height: 220px;
+  }
+  .kartu-grafik canvas { cursor: pointer; }
   .petunjuk { color: #6e7681; font-size: 11px; margin-top: 6px; }
-
-  /* Word Cloud / Kata Kunci Container */
-  .word-cloud-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-content: center;
-    justify-content: center;
-    min-height: 180px;
-    max-height: 220px;
-    overflow-y: auto;
-    padding: 8px;
-  }
-  .word-tag {
-    background: #21262d;
-    border: 1px solid #30363d;
-    border-radius: 12px;
-    padding: 4px 10px;
-    color: #58a6ff;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    user-select: none;
-  }
-  .word-tag:hover {
-    background: #1f6feb;
-    color: #ffffff;
-    border-color: #58a6ff;
-  }
 
   /* Badge Sentimen */
   .badge-pos { background: #238636; color: #ffffff; padding: 3px 8px; border-radius: 12px; font-weight: 600; font-size: 11px; display: inline-block; }
@@ -325,27 +302,35 @@
     </div>
   </div>
 
-  <!-- Grid Grafik & Word Cloud (Semua dalam bentuk bar chart) -->
+  <!-- Grid Grafik (Semua dalam bentuk horizontal bar chart) -->
   <div class="grafik-grid">
     <div class="kartu-grafik">
       <h2>Jumlah Berita / Hari</h2>
-      <canvas id="grafik-per-hari"></canvas>
+      <div class="chart-container">
+        <canvas id="grafik-per-hari"></canvas>
+      </div>
       <div class="petunjuk">Klik batang untuk filter tanggal.</div>
     </div>
     <div class="kartu-grafik">
       <h2>Sentimen</h2>
-      <canvas id="grafik-sentimen"></canvas>
+      <div class="chart-container">
+        <canvas id="grafik-sentimen"></canvas>
+      </div>
       <div class="petunjuk">Klik batang untuk filter sentimen.</div>
     </div>
     <div class="kartu-grafik">
       <h2>Kategori</h2>
-      <canvas id="grafik-kategori"></canvas>
+      <div class="chart-container">
+        <canvas id="grafik-kategori"></canvas>
+      </div>
       <div class="petunjuk">Klik batang untuk filter kategori.</div>
     </div>
     <div class="kartu-grafik">
-      <h2>Word Cloud</h2>
-      <div id="word-cloud" class="word-cloud-container"></div>
-      <div class="petunjuk">Klik kata untuk memfilter pencarian.</div>
+      <h2>Media</h2>
+      <div class="chart-container">
+        <canvas id="grafik-media"></canvas>
+      </div>
+      <div class="petunjuk">Klik batang untuk filter media.</div>
     </div>
   </div>
 </div>
@@ -410,6 +395,7 @@ let arahUrut = 1;
 let chartHari = null;
 let chartSentimen = null;
 let chartKategori = null;
+let chartMedia = null;
 let timerCari = null;
 
 const elPilihTanggal = document.getElementById('pilih-tanggal');
@@ -431,15 +417,20 @@ const WARNA_NORMAL = '#30363d';
 const WARNA_AKTIF = '#58a6ff';
 const WARNA_SENTIMEN = { 'Positif': '#238636', 'Negatif': '#da3633', 'Netral': '#8b949e' };
 
-// Stopwords Bahasa Indonesia untuk Word Cloud
-const STOPWORDS_ID = new Set([
-  'yang', 'di', 'dan', 'dengan', 'untuk', 'pada', 'dari', 'ke', 'ini', 'itu', 'atau', 'juga',
-  'bukan', 'akan', 'bisa', 'ada', 'tidak', 'ia', 'kami', 'kita', 'mereka', 'oleh', 'secara',
-  'sebagai', 'serta', 'dapat', 'tersebut', 'tentang', 'maka', 'telah', 'mengatakan', 'bahwa',
-  'terkait', 'satu', 'dua', 'tiga', 'para', 'seperti', 'namun', 'karena', 'sudah', 'antara',
-  'saat', 'dalam', 'kepada', 'ia', 'dia', 'mereka', 'adalah', 'bahwa', 'tersebut', 'melalui',
-  'bahkan', 'hingga', 'sehingga', 'kemudian', 'setelah', 'sebelum', 'tentang', 'lagi', 'hanya'
-]);
+// Format Tanggal Ke: d mmm yyyy, hh:mm:ss
+function formatTanggalIndo(dateObj) {
+  const bulanIndo = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+    'Jul', 'Agust', 'Sep', 'Okt', 'Nov', 'Des'
+  ];
+  const d = dateObj.getDate();
+  const mmm = bulanIndo[dateObj.getMonth()];
+  const yyyy = dateObj.getFullYear();
+  const hh = String(dateObj.getHours()).padStart(2, '0');
+  const mm = String(dateObj.getMinutes()).padStart(2, '0');
+  const ss = String(dateObj.getSeconds()).padStart(2, '0');
+  return `${d} ${mmm} ${yyyy}, ${hh}:${mm}:${ss}`;
+}
 
 // Sanitasi XSS & Utility
 function escapeHtml(str) {
@@ -458,11 +449,8 @@ async function muatSemuaData() {
     if (!res.ok) throw new Error('index.json tidak ditemukan');
     
     const lastModified = res.headers.get('Last-Modified');
-    if (lastModified) {
-      elWaktuUpdate.textContent = new Date(lastModified).toLocaleString('id-ID');
-    } else {
-      elWaktuUpdate.textContent = new Date().toLocaleString('id-ID');
-    }
+    const tglUpdate = lastModified ? new Date(lastModified) : new Date();
+    elWaktuUpdate.textContent = formatTanggalIndo(tglUpdate);
 
     const daftar = await res.json();  
 
@@ -584,7 +572,7 @@ function renderKPICards(data) {
   document.getElementById('kpi-kategori-sub').textContent = `Kategori topik unik`;
 }
 
-// ---------- RENDER GRAFIK & WORD CLOUD ----------
+// ---------- RENDER GRAFIK (BAR HORIZONTAL & MENAMPILKAN SEMUA DATA) ----------
 
 function renderGrafikPerHari() {
   const data = dataAbaikanFilter('tanggal');
@@ -605,11 +593,13 @@ function renderGrafikPerHari() {
       datasets: [{ label: 'Berita', data: nilai, backgroundColor: warna, borderRadius: 4 }]
     },
     options: {
+      indexAxis: 'y',
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
-        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true }
+        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true },
+        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } }
       },
       onClick: (evt, elemen) => {
         if (elemen.length === 0) return;
@@ -648,11 +638,13 @@ function renderGrafikSentimen() {
       datasets: [{ label: 'Sentimen', data: nilai, backgroundColor: bgWarna, borderRadius: 4 }]
     },
     options: {
+      indexAxis: 'y',
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
-        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true }
+        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true },
+        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } }
       },
       onClick: (evt, elemen) => {
         if (elemen.length === 0) return;
@@ -680,8 +672,8 @@ function renderGrafikKategori() {
     }
   }
 
-  // Urutkan dan ambil top 8 kategori agar bar chart tetap rapi
-  const sortedKat = Object.entries(hitung).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  // Tampilkan SEMUA data kategori tanpa dipotong slice
+  const sortedKat = Object.entries(hitung).sort((a, b) => b[1] - a[1]);
   const label = sortedKat.map(item => item[0]);
   const nilai = sortedKat.map(item => item[1]);
   const warna = label.map(l => l === filterKategori ? WARNA_AKTIF : WARNA_NORMAL);
@@ -695,11 +687,13 @@ function renderGrafikKategori() {
       datasets: [{ label: 'Kategori', data: nilai, backgroundColor: warna, borderRadius: 4 }]
     },
     options: {
+      indexAxis: 'y',
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: '#8b949e', font: { size: 9 }, maxRotation: 45, minRotation: 45 }, grid: { color: '#21262d' } },
-        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true }
+        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true },
+        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } }
       },
       onClick: (evt, elemen) => {
         if (elemen.length === 0) return;
@@ -712,48 +706,47 @@ function renderGrafikKategori() {
   });
 }
 
-function renderWordCloud() {
-  const data = dataTersaring();
-  const frekuensi = {};
-
-  data.forEach(b => {
-    // Word cloud mengekstrak kata substansi berdasarkan topik, ringkasan berita, dan judul
-    const topik = String(b['Topik'] || '');
-    const ringkasan = String(b['Ringkasan'] || '');
-    const judul = String(b['Judul'] || '');
-    
-    const teksGabungan = (topik + ' ' + ringkasan + ' ' + judul).toLowerCase();
-    const kataList = teksGabungan.replace(/[^\w\s]/gi, '').split(/\s+/);
-    
-    kataList.forEach(k => {
-      if (k.length > 3 && !STOPWORDS_ID.has(k) && isNaN(k)) {
-        frekuensi[k] = (frekuensi[k] || 0) + 1;
-      }
-    });
-  });
-
-  const topKata = Object.entries(frekuensi)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 25);
-
-  const container = document.getElementById('word-cloud');
-  if (topKata.length === 0) {
-    container.innerHTML = '<span style="color:#8b949e; font-style:italic;">Tidak ada kata kunci.</span>';
-    return;
+function renderGrafikMedia() {
+  const data = dataAbaikanFilter('media');
+  const hitung = {};
+  
+  for (const b of data) {
+    const m = bersihkanNilai(b['Media']);
+    hitung[m] = (hitung[m] || 0) + 1;
   }
 
-  const maxFreq = topKata[0][1];
-  const minFreq = topKata[topKata.length - 1][1];
+  // Tampilkan SEMUA data media
+  const sortedMedia = Object.entries(hitung).sort((a, b) => b[1] - a[1]);
+  const label = sortedMedia.map(item => item[0]);
+  const nilai = sortedMedia.map(item => item[1]);
+  const warna = label.map(l => l === filterMedia ? WARNA_AKTIF : WARNA_NORMAL);
 
-  container.innerHTML = topKata.map(([kata, freq]) => {
-    const size = minFreq === maxFreq ? 13 : Math.floor(11 + ((freq - minFreq) / (maxFreq - minFreq)) * 11);
-    return `<span class="word-tag" style="font-size: ${size}px;" onclick="terapkanPencarianKata('${escapeHtml(kata)}')">${escapeHtml(kata)}</span>`;
-  }).join('');
-}
-
-function terapkanPencarianKata(kata) {
-  elCari.value = kata;
-  renderSemua();
+  const ctx = document.getElementById('grafik-media');
+  if (chartMedia) chartMedia.destroy();
+  chartMedia = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: label,
+      datasets: [{ label: 'Media', data: nilai, backgroundColor: warna, borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true },
+        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } }
+      },
+      onClick: (evt, elemen) => {
+        if (elemen.length === 0) return;
+        const mediaDiklik = label[elemen[0].index];
+        filterMedia = (filterMedia === mediaDiklik) ? null : mediaDiklik;
+        elPilihMedia.value = filterMedia || '';
+        renderSemua();
+      }
+    }
+  });
 }
 
 // ---------- CHIP FILTER ----------
@@ -939,7 +932,7 @@ function renderSemua() {
   renderGrafikPerHari();
   renderGrafikSentimen();
   renderGrafikKategori();
-  renderWordCloud();
+  renderGrafikMedia();
   renderChipFilter();
   renderTampilanUtama();
 }
