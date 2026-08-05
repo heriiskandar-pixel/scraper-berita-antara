@@ -1,321 +1,1010 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard Monitoring Berita</title>
-  
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#f0f9ff',
-              500: '#0284c7',
-              600: '#0369a1',
-            }
-          }
-        }
-      }
-    }
-  </script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Analisis Berita & Sentimen AI</title>
+<!-- Library External -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    margin: 0;
+    padding: 24px;
+  }
 
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  /* Header & Timestamps */
+  .header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .sub { color: #8b949e; font-size: 13px; margin: 0; }
+  .update-info {
+    font-size: 12px;
+    color: #8b949e;
+    background: #161b22;
+    border: 1px solid #30363d;
+    padding: 6px 12px;
+    border-radius: 6px;
+    text-align: right;
+  }
+
+  /* Ringkasan KPI Cards (3 Kolom) */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: 1fr; }
+  }
+  .kpi-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+  }
+  .kpi-title { font-size: 12px; color: #8b949e; margin-bottom: 6px; }
+  .kpi-value { font-size: 22px; font-weight: 700; color: #e6edf3; }
+  .kpi-sub { font-size: 11px; color: #6e7681; margin-top: 4px; }
+
+  /* Kontrol & Filter */
+  .kontrol {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+  select, input, button {
+    background: #161b22;
+    color: #e6edf3;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  button { cursor: pointer; }
+  button:hover { background: #21262d; }
   
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Chart.js Word Cloud Plugin -->
-  <script src="https://unpkg.com/chartjs-chart-wordcloud@4.2.0/build/index.umd.min.js"></script>
+  .btn-export-excel {
+    background: #161b22;
+    color: #58a6ff;
+    border: 1px solid #30363d;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+  }
+  .btn-export-excel svg {
+    fill: currentColor;
+    width: 16px;
+    height: 16px;
+  }
+  .btn-export-excel:hover {
+    background: #21262d;
+    border-color: #58a6ff;
+  }
+  
+  /* Styling Ikon Switch View */
+  .group-view {
+    display: flex;
+    gap: 2px;
+    background: #161b22;
+    padding: 3px;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+  }
+  .group-view button {
+    border: none;
+    background: transparent;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #8b949e;
+    border-radius: 4px;
+    font-size: 13px;
+    transition: all 0.2s ease;
+  }
+  .group-view button svg {
+    fill: currentColor;
+    width: 16px;
+    height: 16px;
+  }
+  .group-view button.aktif {
+    background: #1f6feb;
+    color: #ffffff;
+  }
+
+  input[type="text"] { flex: 1; min-width: 200px; }
+
+  #filter-aktif {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    min-height: 28px;
+  }
+  .chip {
+    background: #1f6feb33;
+    border: 1px solid #58a6ff;
+    color: #58a6ff;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .chip button {
+    background: none;
+    border: none;
+    color: #58a6ff;
+    cursor: pointer;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  #status { color: #8b949e; font-size: 13px; margin-bottom: 12px; }
+
+  /* Grid Grafik & Word Cloud (4 Bar Chart Grid) */
+  .grafik-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 1200px) {
+    .grafik-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 650px) {
+    .grafik-grid { grid-template-columns: 1fr; }
+  }
+
+  .kartu-grafik {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .kartu-grafik h2 { font-size: 14px; margin: 0 0 10px; color: #c9d1d9; }
+  .kartu-grafik canvas { max-height: 220px; cursor: pointer; }
+  .petunjuk { color: #6e7681; font-size: 11px; margin-top: 6px; }
+
+  /* Word Cloud / Kata Kunci Container */
+  .word-cloud-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-content: center;
+    justify-content: center;
+    min-height: 180px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 8px;
+  }
+  .word-tag {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 4px 10px;
+    color: #58a6ff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+  .word-tag:hover {
+    background: #1f6feb;
+    color: #ffffff;
+    border-color: #58a6ff;
+  }
+
+  /* Badge Sentimen */
+  .badge-pos { background: #238636; color: #ffffff; padding: 3px 8px; border-radius: 12px; font-weight: 600; font-size: 11px; display: inline-block; }
+  .badge-neg { background: #da3633; color: #ffffff; padding: 3px 8px; border-radius: 12px; font-weight: 600; font-size: 11px; display: inline-block; }
+  .badge-net { background: #484f58; color: #ffffff; padding: 3px 8px; border-radius: 12px; font-weight: 600; font-size: 11px; display: inline-block; }
+
+  /* Tampilan Tabel */
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid #30363d; padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #161b22; cursor: pointer; user-select: none; position: sticky; top: 0; }
+  th:hover { background: #21262d; }
+  tr:nth-child(even) { background: #10151c; }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .panah { opacity: 0.5; font-size: 11px; }
+  #tabel-wrap { overflow-x: auto; max-height: 65vh; overflow-y: auto; }
+  td img { width: 140px; height: auto; border-radius: 6px; display: block; }
+  .tidak-ditemukan { color: #8b949e; font-style: italic; }
+
+  /* Tampilan Kartu (Card View) */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    max-height: 65vh;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .news-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .news-card img {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 10px;
+  }
+  .news-card .card-meta {
+    font-size: 11px;
+    color: #8b949e;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .news-card .card-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+  .news-card .card-desc {
+    font-size: 12px;
+    color: #8b949e;
+    margin-bottom: 12px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .news-card .card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid #21262d;
+  }
+</style>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 min-h-screen font-sans transition-colors duration-200">
+<body>
 
-  <!-- Main Container -->
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    
-    <!-- Top Bar / Header -->
-    <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-      <div>
-        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard Monitoring Berita</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Analisis tren, sentimen, dan sebaran media real-time.</p>
-      </div>
-
-      <div class="flex items-center gap-3">
-        <!-- Toggle Theme Button -->
-        <button id="themeToggleBtn" onclick="toggleTheme()" class="p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors">
-          <i id="themeIcon" data-lucide="sun" class="w-5 h-5"></i>
-        </button>
-
-        <!-- Dynamic Theme Excel Export Button -->
-        <button onclick="exportExcel()" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-emerald-500/30 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition-colors">
-          <!-- Excel Icon dynamically updated by script -->
-          <i id="excelIcon" data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
-          <span>Ekspor Excel</span>
-        </button>
-      </div>
-    </header>
-
-    <!-- KPI Cards Section (3 Cards) -->
-    <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      <!-- KPI 1: Jumlah Berita -->
-      <div class="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 shadow-sm flex items-center justify-between">
-        <div>
-          <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Jumlah Berita</p>
-          <p class="text-3xl font-bold mt-2">1,248</p>
-          <span class="text-xs text-emerald-600 dark:text-emerald-400 font-medium inline-flex items-center gap-1 mt-1">
-            <i data-lucide="trending-up" class="w-3.5 h-3.5"></i> +12% dari minggu lalu
-          </span>
-        </div>
-        <div class="p-3.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-          <i data-lucide="newspaper" class="w-7 h-7"></i>
-        </div>
-      </div>
-
-      <!-- KPI 2: Jumlah Media -->
-      <div class="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 shadow-sm flex items-center justify-between">
-        <div>
-          <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Jumlah Media</p>
-          <p class="text-3xl font-bold mt-2">85</p>
-          <span class="text-xs text-gray-500 dark:text-gray-400 font-medium inline-flex items-center gap-1 mt-1">
-            Tersambung aktif
-          </span>
-        </div>
-        <div class="p-3.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
-          <i data-lucide="radio" class="w-7 h-7"></i>
-        </div>
-      </div>
-
-      <!-- KPI 3: Jumlah Kategori -->
-      <div class="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 shadow-sm flex items-center justify-between">
-        <div>
-          <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Jumlah Kategori</p>
-          <p class="text-3xl font-bold mt-2">14</p>
-          <span class="text-xs text-gray-500 dark:text-gray-400 font-medium inline-flex items-center gap-1 mt-1">
-            Terklasifikasi otomatis
-          </span>
-        </div>
-        <div class="p-3.5 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">
-          <i data-lucide="folder-tree" class="w-7 h-7"></i>
-        </div>
-      </div>
-    </section>
-
-    <!-- Charts Section -->
-    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      
-      <!-- Bar Chart 1: Jumlah Berita per Hari -->
-      <div class="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 shadow-sm">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-semibold">Jumlah Berita per Hari</h2>
-          <i data-lucide="calendar" class="w-5 h-5 text-gray-400"></i>
-        </div>
-        <div class="relative h-64">
-          <canvas id="newsPerDayChart"></canvas>
-        </div>
-      </div>
-
-      <!-- Bar Chart 2: Sentimen -->
-      <div class="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 shadow-sm">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-semibold">Analisis Sentimen</h2>
-          <i data-lucide="smile-plus" class="w-5 h-5 text-gray-400"></i>
-        </div>
-        <div class="relative h-64">
-          <canvas id="sentimentChart"></canvas>
-        </div>
-      </div>
-
-      <!-- Bar Chart 3: Kategori -->
-      <div class="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 shadow-sm">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-semibold">Sebaran Berita per Kategori</h2>
-          <i data-lucide="bar-chart-2" class="w-5 h-5 text-gray-400"></i>
-        </div>
-        <div class="relative h-64">
-          <canvas id="categoryChart"></canvas>
-        </div>
-      </div>
-
-      <!-- Chart 4: Word Cloud -->
-      <div class="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 shadow-sm">
-        <div class="flex items-center justify-between mb-1">
-          <h2 class="text-lg font-semibold">Word Cloud (Substansi Topik)</h2>
-          <i data-lucide="cloud" class="w-5 h-5 text-gray-400"></i>
-        </div>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Kata substansi diekstrak dari topik, ringkasan, dan judul berita.</p>
-        <div class="relative h-60 flex items-center justify-center">
-          <canvas id="wordCloudChart"></canvas>
-        </div>
-      </div>
-
-    </section>
+<div>
+  <div class="header-container">
+    <div>
+      <h1>📰 Dashboard Analisis Berita & Sentimen AI</h1>
+      <div class="sub">Klik elemen pada grafik atau gunakan opsi filter untuk menyaring data secara interaktif.</div>
+    </div>
+    <div class="update-info">
+      <div>Diperbarui:</div>
+      <strong id="waktu-update">-</strong>
+    </div>
   </div>
 
-  <!-- JavaScript Initialization -->
-  <script>
-    // System Theme State
-    let isDark = false;
+  <!-- Ringkasan KPI Cards (Jumlah Berita, Jumlah Media, Jumlah Kategori) -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-title">Jumlah Berita</div>
+      <div class="kpi-value" id="kpi-total">0</div>
+      <div class="kpi-sub" id="kpi-total-sub">Dari total 0 berita</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Jumlah Media</div>
+      <div class="kpi-value" id="kpi-media-count">0</div>
+      <div class="kpi-sub" id="kpi-media-sub">Sumber media unik</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Jumlah Kategori</div>
+      <div class="kpi-value" id="kpi-kategori-count">0</div>
+      <div class="kpi-sub" id="kpi-kategori-sub">Kategori topik unik</div>
+    </div>
+  </div>
 
-    function toggleTheme() {
-      isDark = !isDark;
-      const html = document.documentElement;
-      const themeIcon = document.getElementById('themeIcon');
-      const excelIcon = document.getElementById('excelIcon');
+  <!-- Grid Grafik & Word Cloud (Semua dalam bentuk bar chart) -->
+  <div class="grafik-grid">
+    <div class="kartu-grafik">
+      <h2>Jumlah Berita / Hari</h2>
+      <canvas id="grafik-per-hari"></canvas>
+      <div class="petunjuk">Klik batang untuk filter tanggal.</div>
+    </div>
+    <div class="kartu-grafik">
+      <h2>Sentimen</h2>
+      <canvas id="grafik-sentimen"></canvas>
+      <div class="petunjuk">Klik batang untuk filter sentimen.</div>
+    </div>
+    <div class="kartu-grafik">
+      <h2>Kategori</h2>
+      <canvas id="grafik-kategori"></canvas>
+      <div class="petunjuk">Klik batang untuk filter kategori.</div>
+    </div>
+    <div class="kartu-grafik">
+      <h2>Word Cloud</h2>
+      <div id="word-cloud" class="word-cloud-container"></div>
+      <div class="petunjuk">Klik kata untuk memfilter pencarian.</div>
+    </div>
+  </div>
+</div>
 
-      if (isDark) {
-        html.classList.add('dark');
-        themeIcon.setAttribute('data-lucide', 'moon');
-        // Custom styling for dark theme excel icon state
-        excelIcon.className = "w-4 h-4 text-emerald-400";
-      } else {
-        html.classList.remove('dark');
-        themeIcon.setAttribute('data-lucide', 'sun');
-        // Custom styling for light theme excel icon state
-        excelIcon.className = "w-4 h-4 text-emerald-600";
+<div class="kontrol">
+  <!-- Filter Tanggal -->
+  <select id="pilih-tanggal"><option value="">Semua Tanggal</option></select>
+  
+  <!-- Filter Media -->
+  <select id="pilih-media"><option value="">Semua Media</option></select>
+
+  <!-- Filter Sentimen -->
+  <select id="pilih-sentimen">
+    <option value="">Semua Sentimen</option>
+    <option value="Positif">Positif</option>
+    <option value="Netral">Netral</option>
+    <option value="Negatif">Negatif</option>
+  </select>
+
+  <!-- Filter Kategori -->
+  <select id="pilih-kategori"><option value="">Semua Kategori</option></select>
+
+  <!-- Pencarian Bebas -->
+  <input type="text" id="cari" placeholder="Cari kata kunci...">
+
+  <!-- Switch Mode View -->
+  <div class="group-view">
+    <button id="btn-view-table" class="aktif" title="Tampilan Tabel">
+      <svg viewBox="0 0 16 16"><path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v2.5h13v-2.5a.25.25 0 0 0-.25-.25Zm13 4h-13v3h13Zm0 4.5h-13v3.75c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25Z"/></svg>
+      Tabel
+    </button>
+    <button id="btn-view-card" title="Tampilan Kartu">
+      <svg viewBox="0 0 16 16"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5ZM9 2.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5ZM1 10.5A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5ZM9 10.5A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5Z"/></svg>
+      Kartu
+    </button>
+  </div>
+
+  <button id="reset-filter">Reset Filter</button>
+  
+  <!-- Tombol Ekspor Excel dengan Ikon Theme -->
+  <button id="btn-export-excel" class="btn-export-excel">
+    <svg viewBox="0 0 16 16"><path d="M2.75 1A1.75 1.75 0 0 0 1 2.75v10.5C1 14.216 1.784 15 2.75 15h10.5A1.75 1.75 0 0 0 15 13.25V2.75A1.75 1.75 0 0 0 13.25 1H2.75ZM2 2.75a.25.25 0 0 1 .25-.25h10.5a.25.25 0 0 1 .25.25v2H2v-2Zm0 3.5h11v3.5H2v-3.5Zm0 4.5h11v3.25a.25.25 0 0 1-.25.25H2.75a.25.25 0 0 1-.25-.25V10.75Zm2.5-7.25h2v1.5h-2V3.5Zm0 4.5h2v1.5h-2V8Zm0 4.5h2v1.5h-2V12.5Z"/></svg>
+    Ekspor Excel
+  </button>
+</div>
+
+<div id="filter-aktif"></div>
+<div id="status">Memuat data...</div>
+<div id="tabel-wrap"></div>
+
+<script>
+let semuaData = [];        
+let filterTanggal = null;  
+let filterKategori = null; 
+let filterSentimen = null; 
+let filterMedia = null;
+let modeView = 'table'; 
+
+let kolomUrut = null;
+let arahUrut = 1;
+
+let chartHari = null;
+let chartSentimen = null;
+let chartKategori = null;
+let timerCari = null;
+
+const elPilihTanggal = document.getElementById('pilih-tanggal');
+const elPilihMedia = document.getElementById('pilih-media');
+const elPilihSentimen = document.getElementById('pilih-sentimen');
+const elPilihKategori = document.getElementById('pilih-kategori');
+const elCari = document.getElementById('cari');
+const elStatus = document.getElementById('status');
+const elTabelWrap = document.getElementById('tabel-wrap');
+const elFilterAktif = document.getElementById('filter-aktif');
+const elResetFilter = document.getElementById('reset-filter');
+const elWaktuUpdate = document.getElementById('waktu-update');
+const elBtnExportExcel = document.getElementById('btn-export-excel');
+
+const btnViewTable = document.getElementById('btn-view-table');
+const btnViewCard = document.getElementById('btn-view-card');
+
+const WARNA_NORMAL = '#30363d';
+const WARNA_AKTIF = '#58a6ff';
+const WARNA_SENTIMEN = { 'Positif': '#238636', 'Negatif': '#da3633', 'Netral': '#8b949e' };
+
+// Stopwords Bahasa Indonesia untuk Word Cloud
+const STOPWORDS_ID = new Set([
+  'yang', 'di', 'dan', 'dengan', 'untuk', 'pada', 'dari', 'ke', 'ini', 'itu', 'atau', 'juga',
+  'bukan', 'akan', 'bisa', 'ada', 'tidak', 'ia', 'kami', 'kita', 'mereka', 'oleh', 'secara',
+  'sebagai', 'serta', 'dapat', 'tersebut', 'tentang', 'maka', 'telah', 'mengatakan', 'bahwa',
+  'terkait', 'satu', 'dua', 'tiga', 'para', 'seperti', 'namun', 'karena', 'sudah', 'antara',
+  'saat', 'dalam', 'kepada', 'ia', 'dia', 'mereka', 'adalah', 'bahwa', 'tersebut', 'melalui',
+  'bahkan', 'hingga', 'sehingga', 'kemudian', 'setelah', 'sebelum', 'tentang', 'lagi', 'hanya'
+]);
+
+// Sanitasi XSS & Utility
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ---------- MUAT DATA ----------
+
+async function muatSemuaData() {
+  try {
+    const res = await fetch('data/index.json?_=' + Date.now());
+    if (!res.ok) throw new Error('index.json tidak ditemukan');
+    
+    const lastModified = res.headers.get('Last-Modified');
+    if (lastModified) {
+      elWaktuUpdate.textContent = new Date(lastModified).toLocaleString('id-ID');
+    } else {
+      elWaktuUpdate.textContent = new Date().toLocaleString('id-ID');
+    }
+
+    const daftar = await res.json();  
+
+    if (daftar.length === 0) {
+      elStatus.textContent = 'Belum ada file berita tersedia.';
+      return;
+    }
+
+    elPilihTanggal.innerHTML = '<option value="">Semua Tanggal</option>' +
+      daftar.map(d => `<option value="${escapeHtml(d.tanggal)}">${escapeHtml(d.tanggal)}</option>`).join('');
+
+    elStatus.textContent = `Memuat ${daftar.length} file...`;
+
+    const hasil = await Promise.all(daftar.map(async d => {
+      try {
+        const r = await fetch('data/' + d.file + '?_=' + Date.now());
+        if (!r.ok) return [];
+        const buffer = await r.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const baris = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        return baris.map(b => ({ ...b, _tanggalFile: d.tanggal }));
+      } catch (e) {
+        return [];
       }
+    }));
 
-      lucide.createIcons();
-      updateChartColors();
-    }
+    semuaData = hasil.flat();
 
-    function exportExcel() {
-      alert('Mengekspor data ke format Excel...');
-    }
+    populateFilterOptions();
+    renderSemua();
+  } catch (e) {
+    elStatus.textContent = 'Gagal memuat data: ' + e.message;
+  }
+}
 
-    // Chart instances store
-    let charts = {};
+function populateFilterOptions() {
+  const mediaSet = new Set();
+  const kategoriSet = new Set();
 
-    function initCharts() {
-      const textColor = isDark ? '#9ca3af' : '#4b5563';
-      const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+  semuaData.forEach(b => {
+    if (b['Media']) mediaSet.add(String(b['Media']).trim());
+    pecahKategori(b).forEach(k => kategoriSet.add(k));
+  });
 
-      // 1. Jumlah Berita per Hari (Bar Chart)
-      const ctx1 = document.getElementById('newsPerDayChart').getContext('2d');
-      charts.newsPerDay = new Chart(ctx1, {
-        type: 'bar',
-        data: {
-          labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Ming'],
-          datasets: [{
-            label: 'Jumlah Berita',
-            data: [140, 190, 230, 180, 290, 110, 108],
-            backgroundColor: '#0284c7',
-            borderRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks: { color: textColor }, grid: { display: false } },
-            y: { ticks: { color: textColor }, grid: { color: gridColor } }
-          }
-        }
-      });
+  elPilihMedia.innerHTML = '<option value="">Semua Media</option>' +
+    Array.from(mediaSet).sort().map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
 
-      // 2. Sentimen (Bar Chart)
-      const ctx2 = document.getElementById('sentimentChart').getContext('2d');
-      charts.sentiment = new Chart(ctx2, {
-        type: 'bar',
-        data: {
-          labels: ['Positif', 'Netral', 'Negatif'],
-          datasets: [{
-            label: 'Jumlah Sentimen',
-            data: [620, 410, 218],
-            backgroundColor: ['#10b981', '#6b7280', '#ef4444'],
-            borderRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks: { color: textColor }, grid: { display: false } },
-            y: { ticks: { color: textColor }, grid: { color: gridColor } }
-          }
-        }
-      });
+  elPilihKategori.innerHTML = '<option value="">Semua Kategori</option>' +
+    Array.from(kategoriSet).sort().map(k => `<option value="${escapeHtml(k)}">${escapeHtml(k)}</option>`).join('');
+}
 
-      // 3. Kategori (Bar Chart)
-      const ctx3 = document.getElementById('categoryChart').getContext('2d');
-      charts.category = new Chart(ctx3, {
-        type: 'bar',
-        data: {
-          labels: ['Politik', 'Ekonomi', 'Teknologi', 'Hukum', 'Edukasi'],
-          datasets: [{
-            label: 'Jumlah Berita',
-            data: [340, 280, 210, 190, 120],
-            backgroundColor: '#8b5cf6',
-            borderRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          indexAxis: 'y', // Horizontal Bar Chart
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks: { color: textColor }, grid: { color: gridColor } },
-            y: { ticks: { color: textColor }, grid: { display: false } }
-          }
-        }
-      });
+// ---------- FUNGSI FILTER & UTILITY ----------
 
-      // 4. Word Cloud Chart
-      const ctx4 = document.getElementById('wordCloudChart').getContext('2d');
-      charts.wordCloud = new Chart(ctx4, {
-        type: 'wordCloud',
-        data: {
-          labels: ['Ekonomi', 'Pemerintah', 'Digital', 'Investasi', 'Kebijakan', 'Inflasi', 'Pasar', 'Inovasi', 'Pertumbuhan', 'Teknologi', 'Pembangunan', 'Transformasi', 'Masyarakat', 'Layanan'],
-          datasets: [{
-            label: 'Frekuensi Kata',
-            data: [90, 80, 75, 65, 60, 55, 50, 45, 40, 38, 35, 30, 25, 20]
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            wordCloud: {
-              color: () => isDark ? '#e0f2fe' : '#0369a1',
-              fontFamily: 'sans-serif',
-              fontWeight: 'bold'
-            }
-          }
-        }
-      });
-    }
+function bersihkanNilai(val) {
+  if (!val || String(val).trim() === '' || String(val).toLowerCase() === 'undefined') {
+    return 'tidak ditemukan';
+  }
+  return String(val).trim();
+}
 
-    function updateChartColors() {
-      const textColor = isDark ? '#9ca3af' : '#4b5563';
-      const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+function cocokPencarian(baris, kataKunci) {
+  if (!kataKunci) return true;
+  return Object.values(baris).some(v => String(v).toLowerCase().includes(kataKunci));
+}
 
-      ['newsPerDay', 'sentiment', 'category'].forEach(chartKey => {
-        if (charts[chartKey]) {
-          charts[chartKey].options.scales.x.ticks.color = textColor;
-          charts[chartKey].options.scales.y.ticks.color = textColor;
-          if (charts[chartKey].options.scales.x.grid) charts[chartKey].options.scales.x.grid.color = gridColor;
-          if (charts[chartKey].options.scales.y.grid) charts[chartKey].options.scales.y.grid.color = gridColor;
-          charts[chartKey].update();
-        }
-      });
+function pecahKategori(baris) {
+  const mentah = String(baris['Kategori'] ?? '').trim();
+  if (!mentah) return [];
+  return mentah.split(',').map(s => s.trim()).filter(Boolean);
+}
 
-      if (charts.wordCloud) {
-        charts.wordCloud.options.plugins.wordCloud.color = () => isDark ? '#38bdf8' : '#0284c7';
-        charts.wordCloud.update();
+function dataTersaring() {
+  const kataKunci = elCari.value.trim().toLowerCase();
+  return semuaData.filter(b => {
+    if (!cocokPencarian(b, kataKunci)) return false;
+    if (filterTanggal && b._tanggalFile !== filterTanggal) return false;
+    if (filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
+    if (filterSentimen && String(b['Sentimen'] ?? '').trim() !== filterSentimen) return false;
+    if (filterMedia && String(b['Media'] ?? '').trim() !== filterMedia) return false;
+    return true;
+  });
+}
+
+function dataAbaikanFilter(field) {
+  const kataKunci = elCari.value.trim().toLowerCase();
+  return semuaData.filter(b => {
+    if (!cocokPencarian(b, kataKunci)) return false;
+    if (field !== 'tanggal' && filterTanggal && b._tanggalFile !== filterTanggal) return false;
+    if (field !== 'kategori' && filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
+    if (field !== 'sentimen' && filterSentimen && String(b['Sentimen'] ?? '').trim() !== filterSentimen) return false;
+    if (field !== 'media' && filterMedia && String(b['Media'] ?? '').trim() !== filterMedia) return false;
+    return true;
+  });
+}
+
+// ---------- RENDER KPI CARDS ----------
+
+function renderKPICards(data) {
+  const totalTampil = data.length;
+  const totalKeseluruhan = semuaData.length;
+  
+  document.getElementById('kpi-total').textContent = totalTampil;
+  document.getElementById('kpi-total-sub').textContent = `Dari total ${totalKeseluruhan} berita`;
+
+  const mediaSet = new Set();
+  const kategoriSet = new Set();
+
+  data.forEach(b => {
+    const m = bersihkanNilai(b['Media']);
+    if (m !== 'tidak ditemukan') mediaSet.add(m);
+    pecahKategori(b).forEach(k => kategoriSet.add(k));
+  });
+
+  document.getElementById('kpi-media-count').textContent = mediaSet.size;
+  document.getElementById('kpi-media-sub').textContent = `Sumber media unik`;
+
+  document.getElementById('kpi-kategori-count').textContent = kategoriSet.size;
+  document.getElementById('kpi-kategori-sub').textContent = `Kategori topik unik`;
+}
+
+// ---------- RENDER GRAFIK & WORD CLOUD ----------
+
+function renderGrafikPerHari() {
+  const data = dataAbaikanFilter('tanggal');
+  const hitung = {};
+  for (const b of data) {
+    hitung[b._tanggalFile] = (hitung[b._tanggalFile] || 0) + 1;
+  }
+  const label = Object.keys(hitung).sort();
+  const nilai = label.map(l => hitung[l]);
+  const warna = label.map(l => l === filterTanggal ? WARNA_AKTIF : WARNA_NORMAL);
+
+  const ctx = document.getElementById('grafik-per-hari');
+  if (chartHari) chartHari.destroy();
+  chartHari = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: label,
+      datasets: [{ label: 'Berita', data: nilai, backgroundColor: warna, borderRadius: 4 }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
+        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true }
+      },
+      onClick: (evt, elemen) => {
+        if (elemen.length === 0) return;
+        const tgl = label[elemen[0].index];
+        filterTanggal = (filterTanggal === tgl) ? null : tgl;
+        elPilihTanggal.value = filterTanggal || '';
+        renderSemua();
       }
     }
+  });
+}
 
-    // Initialize Lucide icons and charts on load
-    document.addEventListener('DOMContentLoaded', () => {
-      lucide.createIcons();
-      initCharts();
+function renderGrafikSentimen() {
+  const data = dataAbaikanFilter('sentimen');
+  const hitung = { 'Positif': 0, 'Netral': 0, 'Negatif': 0 };
+  
+  for (const b of data) {
+    const s = String(b['Sentimen'] || 'Netral').trim();
+    if (hitung[s] !== undefined) hitung[s]++;
+    else hitung['Netral']++;
+  }
+
+  const label = Object.keys(hitung);
+  const nilai = Object.values(hitung);
+  const bgWarna = label.map(l => {
+    if (filterSentimen) return l === filterSentimen ? WARNA_SENTIMEN[l] : WARNA_NORMAL;
+    return WARNA_SENTIMEN[l];
+  });
+
+  const ctx = document.getElementById('grafik-sentimen');
+  if (chartSentimen) chartSentimen.destroy();
+  chartSentimen = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: label,
+      datasets: [{ label: 'Sentimen', data: nilai, backgroundColor: bgWarna, borderRadius: 4 }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
+        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true }
+      },
+      onClick: (evt, elemen) => {
+        if (elemen.length === 0) return;
+        const sentimenDiklik = label[elemen[0].index];
+        filterSentimen = (filterSentimen === sentimenDiklik) ? null : sentimenDiklik;
+        elPilihSentimen.value = filterSentimen || '';
+        renderSemua();
+      }
+    }
+  });
+}
+
+function renderGrafikKategori() {
+  const data = dataAbaikanFilter('kategori');
+  const hitung = {};
+  
+  for (const b of data) {
+    const katList = pecahKategori(b);
+    if (katList.length === 0) {
+      hitung['Tanpa Kategori'] = (hitung['Tanpa Kategori'] || 0) + 1;
+    } else {
+      katList.forEach(k => {
+        hitung[k] = (hitung[k] || 0) + 1;
+      });
+    }
+  }
+
+  // Urutkan dan ambil top 8 kategori agar bar chart tetap rapi
+  const sortedKat = Object.entries(hitung).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const label = sortedKat.map(item => item[0]);
+  const nilai = sortedKat.map(item => item[1]);
+  const warna = label.map(l => l === filterKategori ? WARNA_AKTIF : WARNA_NORMAL);
+
+  const ctx = document.getElementById('grafik-kategori');
+  if (chartKategori) chartKategori.destroy();
+  chartKategori = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: label,
+      datasets: [{ label: 'Kategori', data: nilai, backgroundColor: warna, borderRadius: 4 }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b949e', font: { size: 9 }, maxRotation: 45, minRotation: 45 }, grid: { color: '#21262d' } },
+        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true }
+      },
+      onClick: (evt, elemen) => {
+        if (elemen.length === 0) return;
+        const katDiklik = label[elemen[0].index];
+        filterKategori = (filterKategori === katDiklik) ? null : katDiklik;
+        elPilihKategori.value = filterKategori || '';
+        renderSemua();
+      }
+    }
+  });
+}
+
+function renderWordCloud() {
+  const data = dataTersaring();
+  const frekuensi = {};
+
+  data.forEach(b => {
+    // Word cloud mengekstrak kata substansi berdasarkan topik, ringkasan berita, dan judul
+    const topik = String(b['Topik'] || '');
+    const ringkasan = String(b['Ringkasan'] || '');
+    const judul = String(b['Judul'] || '');
+    
+    const teksGabungan = (topik + ' ' + ringkasan + ' ' + judul).toLowerCase();
+    const kataList = teksGabungan.replace(/[^\w\s]/gi, '').split(/\s+/);
+    
+    kataList.forEach(k => {
+      if (k.length > 3 && !STOPWORDS_ID.has(k) && isNaN(k)) {
+        frekuensi[k] = (frekuensi[k] || 0) + 1;
+      }
     });
-  </script>
+  });
+
+  const topKata = Object.entries(frekuensi)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 25);
+
+  const container = document.getElementById('word-cloud');
+  if (topKata.length === 0) {
+    container.innerHTML = '<span style="color:#8b949e; font-style:italic;">Tidak ada kata kunci.</span>';
+    return;
+  }
+
+  const maxFreq = topKata[0][1];
+  const minFreq = topKata[topKata.length - 1][1];
+
+  container.innerHTML = topKata.map(([kata, freq]) => {
+    const size = minFreq === maxFreq ? 13 : Math.floor(11 + ((freq - minFreq) / (maxFreq - minFreq)) * 11);
+    return `<span class="word-tag" style="font-size: ${size}px;" onclick="terapkanPencarianKata('${escapeHtml(kata)}')">${escapeHtml(kata)}</span>`;
+  }).join('');
+}
+
+function terapkanPencarianKata(kata) {
+  elCari.value = kata;
+  renderSemua();
+}
+
+// ---------- CHIP FILTER ----------
+
+function renderChipFilter() {
+  const chip = [];
+  if (filterTanggal) {
+    chip.push(`<span class="chip">Tanggal: ${escapeHtml(filterTanggal)} <button onclick="hapusFilterTanggal()">✕</button></span>`);
+  }
+  if (filterMedia) {
+    chip.push(`<span class="chip">Media: ${escapeHtml(filterMedia)} <button onclick="hapusFilterMedia()">✕</button></span>`);
+  }
+  if (filterSentimen) {
+    chip.push(`<span class="chip">Sentimen: ${escapeHtml(filterSentimen)} <button onclick="hapusFilterSentimen()">✕</button></span>`);
+  }
+  if (filterKategori) {
+    chip.push(`<span class="chip">Kategori: ${escapeHtml(filterKategori)} <button onclick="hapusFilterKategori()">✕</button></span>`);
+  }
+  elFilterAktif.innerHTML = chip.join('');
+}
+
+function hapusFilterTanggal() { filterTanggal = null; elPilihTanggal.value = ''; renderSemua(); }
+function hapusFilterMedia() { filterMedia = null; elPilihMedia.value = ''; renderSemua(); }
+function hapusFilterSentimen() { filterSentimen = null; elPilihSentimen.value = ''; renderSemua(); }
+function hapusFilterKategori() { filterKategori = null; elPilihKategori.value = ''; renderSemua(); }
+
+// ---------- RENDER TAMPILAN UTAMA ----------
+
+function renderTampilanUtama() {
+  let data = dataTersaring();
+
+  if (kolomUrut) {
+    data.sort((a, b) => {
+      const va = String(a[kolomUrut] ?? '');
+      const vb = String(b[kolomUrut] ?? '');
+      return va.localeCompare(vb, 'id') * arahUrut;
+    });
+  }
+
+  renderKPICards(data);
+  elStatus.textContent = `${data.length} berita ditampilkan (dari total ${semuaData.length})`;
+
+  if (data.length === 0) {
+    elTabelWrap.innerHTML = '<p style="color:#8b949e">Tidak ada data yang cocok.</p>';
+    return;
+  }
+
+  if (modeView === 'table') {
+    renderTabel(data);
+  } else {
+    renderKartu(data);
+  }
+}
+
+// Render Tabel
+function renderTabel(data) {
+  const kolom = Object.keys(semuaData[0]).filter(k => k !== '_tanggalFile' && k !== 'Link');
+
+  let html = '<table><thead><tr>';
+  for (const k of kolom) {
+    let panah = '';
+    if (kolomUrut === k) panah = arahUrut === 1 ? ' ▲' : ' ▼';
+    html += `<th data-kolom="${escapeHtml(k)}">${escapeHtml(k)}<span class="panah">${panah}</span></th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const baris of data) {
+    html += '<tr>';
+    for (const k of kolom) {
+      let nilai = baris[k];
+      const linkBerita = escapeHtml(baris['Link'] || '#');
+
+      if (k === 'Judul' && nilai) {
+        html += `<td><a href="${linkBerita}" target="_blank" rel="noopener"><strong>${escapeHtml(nilai)}</strong></a></td>`;
+      } else if (k === 'Penulis' || k === 'Author') {
+        const valPenulis = bersihkanNilai(nilai);
+        if (valPenulis === 'tidak ditemukan') {
+          html += `<td><span class="tidak-ditemukan">tidak ditemukan</span></td>`;
+        } else {
+          html += `<td>${escapeHtml(valPenulis)}</td>`;
+        }
+      } else if (k === 'URL Gambar' && nilai) {
+        html += `<td><a href="${linkBerita}" target="_blank" rel="noopener"><img src="${escapeHtml(nilai)}" loading="lazy" alt="gambar" onerror="this.onerror=null; this.src='https://via.placeholder.com/300x160?text=No+Image';"></a></td>`;
+      } else if (k === 'Sentimen') {
+        let cls = 'badge-net';
+        if (nilai === 'Positif') cls = 'badge-pos';
+        else if (nilai === 'Negatif') cls = 'badge-neg';
+        html += `<td><span class="${cls}">${escapeHtml(nilai)}</span></td>`;
+      } else {
+        html += `<td>${escapeHtml(String(nilai ?? ''))}</td>`;
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  elTabelWrap.innerHTML = html;
+
+  elTabelWrap.querySelectorAll('th').forEach(th => {
+    th.addEventListener('click', () => {
+      const k = th.dataset.kolom;
+      if (kolomUrut === k) {
+        arahUrut *= -1;
+      } else {
+        kolomUrut = k;
+        arahUrut = 1;
+      }
+      renderTampilanUtama();
+    });
+  });
+}
+
+// Render Kartu (Card View)
+function renderKartu(data) {
+  let html = '<div class="card-grid">';
+
+  for (const baris of data) {
+    const judul = escapeHtml(baris['Judul'] || 'Tanpa Judul');
+    const media = escapeHtml(bersihkanNilai(baris['Media']));
+    const penulis = escapeHtml(bersihkanNilai(baris['Penulis'] || baris['Author']));
+    const tanggal = escapeHtml(baris['Tanggal'] || baris._tanggalFile || '');
+    const gambar = escapeHtml(baris['URL Gambar'] || '');
+    const ringkasan = escapeHtml(baris['Ringkasan'] || baris['Isi'] || '');
+    const sentimen = baris['Sentimen'] || 'Netral';
+    const link = escapeHtml(baris['Link'] || '#');
+
+    let cls = 'badge-net';
+    if (sentimen === 'Positif') cls = 'badge-pos';
+    else if (sentimen === 'Negatif') cls = 'badge-neg';
+
+    html += `
+      <div class="news-card">
+        <div>
+          ${gambar ? `<a href="${link}" target="_blank" rel="noopener"><img src="${gambar}" loading="lazy" alt="gambar" onerror="this.onerror=null; this.src='https://via.placeholder.com/300x160?text=No+Image';"></a>` : ''}
+          <div class="card-meta">
+            <span><strong>${media}</strong> • ${tanggal}</span>
+            <span class="${cls}">${escapeHtml(sentimen)}</span>
+          </div>
+          <div class="card-title">
+            <a href="${link}" target="_blank" rel="noopener">${judul}</a>
+          </div>
+          <div style="font-size:11px; color:#8b949e; margin-bottom:8px;">
+            Penulis: ${penulis === 'tidak ditemukan' ? '<span class="tidak-ditemukan">tidak ditemukan</span>' : penulis}
+          </div>
+          ${ringkasan ? `<div class="card-desc">${ringkasan}</div>` : ''}
+        </div>
+        <div class="card-footer">
+          <span style="font-size:11px; color:#8b949e;">${escapeHtml(baris['Kategori'] || '')}</span>
+          <a href="${link}" target="_blank" rel="noopener" style="font-weight:600; font-size:12px;">Baca Selengkapnya →</a>
+        </div>
+      </div>
+    `;
+  }
+  html += '</div>';
+  elTabelWrap.innerHTML = html;
+}
+
+// ---------- EKSPOR DATA ----------
+
+function eksporKeExcel() {
+  const data = dataTersaring();
+  if (data.length === 0) {
+    alert('Tidak ada data yang dapat diekspor.');
+    return;
+  }
+
+  const dataEkspor = data.map(item => {
+    const copy = { ...item };
+    delete copy._tanggalFile;
+    return copy;
+  });
+
+  const ws = XLSX.utils.json_to_sheet(dataEkspor);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Data Berita");
+  
+  const dateStr = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `Laporan_Berita_Tersaring_${dateStr}.xlsx`);
+}
+
+// ---------- EVENT HANDLERS & INITIALIZATION ----------
+
+function renderSemua() {
+  renderGrafikPerHari();
+  renderGrafikSentimen();
+  renderGrafikKategori();
+  renderWordCloud();
+  renderChipFilter();
+  renderTampilanUtama();
+}
+
+elPilihTanggal.addEventListener('change', (e) => {
+  filterTanggal = e.target.value || null;
+  renderSemua();
+});
+
+elPilihMedia.addEventListener('change', (e) => {
+  filterMedia = e.target.value || null;
+  renderSemua();
+});
+
+elPilihSentimen.addEventListener('change', (e) => {
+  filterSentimen = e.target.value || null;
+  renderSemua();
+});
+
+elPilihKategori.addEventListener('change', (e) => {
+  filterKategori = e.target.value || null;
+  renderSemua();
+});
+
+elCari.addEventListener('input', () => {
+  clearTimeout(timerCari);
+  timerCari = setTimeout(() => {
+    renderSemua();
+  }, 300);
+});
+
+elResetFilter.addEventListener('click', () => {
+  filterTanggal = null;
+  filterMedia = null;
+  filterSentimen = null;
+  filterKategori = null;
+  elCari.value = '';
+  
+  elPilihTanggal.value = '';
+  elPilihMedia.value = '';
+  elPilihSentimen.value = '';
+  elPilihKategori.value = '';
+
+  renderSemua();
+});
+
+btnViewTable.addEventListener('click', () => {
+  modeView = 'table';
+  btnViewTable.classList.add('aktif');
+  btnViewCard.classList.remove('aktif');
+  renderTampilanUtama();
+});
+
+btnViewCard.addEventListener('click', () => {
+  modeView = 'card';
+  btnViewCard.classList.add('aktif');
+  btnViewTable.classList.remove('aktif');
+  renderTampilanUtama();
+});
+
+elBtnExportExcel.addEventListener('click', eksporKeExcel);
+
+// Jalankan Muat Data saat Dokumen Siap
+document.addEventListener('DOMContentLoaded', muatSemuaData);
+</script>
+
 </body>
 </html>
