@@ -1,212 +1,947 @@
 <!DOCTYPE html>
-<html lang="id" class="dark">
+<html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard Analisis Media & Berita</title>
-  
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-    }
-  </script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Analisis Berita & Sentimen AI</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    margin: 0;
+    padding: 24px;
+  }
 
-  <!-- React & ReactDOM CDN -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  /* Header & Timestamps */
+  .header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .sub { color: #8b949e; font-size: 13px; margin: 0; }
+  .update-info {
+    font-size: 12px;
+    color: #8b949e;
+    background: #161b22;
+    border: 1px solid #30363d;
+    padding: 6px 12px;
+    border-radius: 6px;
+    text-align: right;
+  }
+
+  /* Ringkasan KPI Cards */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 500px) {
+    .kpi-grid { grid-template-columns: 1fr; }
+  }
+  .kpi-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+  }
+  .kpi-title { font-size: 12px; color: #8b949e; margin-bottom: 6px; }
+  .kpi-value { font-size: 22px; font-weight: 700; color: #e6edf3; }
+  .kpi-sub { font-size: 11px; color: #6e7681; margin-top: 4px; }
+
+  /* Kontrol & Filter */
+  .kontrol {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+  select, input, button {
+    background: #161b22;
+    color: #e6edf3;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  button { cursor: pointer; }
+  button:hover { background: #21262d; }
   
-  <!-- Prop-Types & Recharts CDN -->
-  <script src="https://unpkg.com/prop-types/prop-types.min.js"></script>
-  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+  .btn-export {
+    background: #238636;
+    color: #ffffff;
+    border: 1px solid #2ea043;
+    font-weight: 600;
+  }
+  .btn-export:hover {
+    background: #2ea043;
+  }
   
-  <!-- Babel Standalone untuk JSX -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  /* Styling Ikon Switch View Bertema */
+  .group-view {
+    display: flex;
+    gap: 2px;
+    background: #161b22;
+    padding: 3px;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+  }
+  .group-view button {
+    border: none;
+    background: transparent;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #8b949e;
+    border-radius: 4px;
+    font-size: 13px;
+    transition: all 0.2s ease;
+  }
+  .group-view button svg {
+    fill: currentColor;
+    width: 16px;
+    height: 16px;
+  }
+  .group-view button.aktif {
+    background: #1f6feb;
+    color: #ffffff;
+  }
+
+  input[type="text"] { flex: 1; min-width: 200px; }
+
+  #filter-aktif {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    min-height: 28px;
+  }
+  .chip {
+    background: #1f6feb33;
+    border: 1px solid #58a6ff;
+    color: #58a6ff;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .chip button {
+    background: none;
+    border: none;
+    color: #58a6ff;
+    cursor: pointer;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  #status { color: #8b949e; font-size: 13px; margin-bottom: 12px; }
+
+  /* Grid Grafik (4 Kolom) */
+  .grafik-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 1200px) {
+    .grafik-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 650px) {
+    .grafik-grid { grid-template-columns: 1fr; }
+  }
+
+  .kartu-grafik {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .kartu-grafik h2 { font-size: 14px; margin: 0 0 10px; color: #c9d1d9; }
+  .kartu-grafik canvas { max-height: 220px; cursor: pointer; }
+  .petunjuk { color: #6e7681; font-size: 11px; margin-top: 6px; }
+
+  /* Badge Sentimen */
+  .badge-pos { background: #238636; color: #ffffff; padding: 3px 8px; border-radius: 12px; font-weight: 600; font-size: 11px; display: inline-block; }
+  .badge-neg { background: #da3633; color: #ffffff; padding: 3px 8px; border-radius: 12px; font-weight: 600; font-size: 11px; display: inline-block; }
+  .badge-net { background: #484f58; color: #ffffff; padding: 3px 8px; border-radius: 12px; font-weight: 600; font-size: 11px; display: inline-block; }
+
+  /* Tampilan Tabel */
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid #30363d; padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #161b22; cursor: pointer; user-select: none; position: sticky; top: 0; }
+  th:hover { background: #21262d; }
+  tr:nth-child(even) { background: #10151c; }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .panah { opacity: 0.5; font-size: 11px; }
+  #tabel-wrap { overflow-x: auto; max-height: 65vh; overflow-y: auto; }
+  td img { width: 140px; height: auto; border-radius: 6px; display: block; }
+  .tidak-ditemukan { color: #8b949e; font-style: italic; }
+
+  /* Tampilan Kartu (Card View) */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    max-height: 65vh;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .news-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .news-card img {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 10px;
+  }
+  .news-card .card-meta {
+    font-size: 11px;
+    color: #8b949e;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .news-card .card-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+  .news-card .card-desc {
+    font-size: 12px;
+    color: #8b949e;
+    margin-bottom: 12px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .news-card .card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid #21262d;
+  }
+</style>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 min-h-screen">
+<body>
 
-  <div id="root"></div>
+<div class="header-container">
+  <div>
+    <h1>📰 Dashboard Analisis Berita & Sentimen AI</h1>
+    <div class="sub">Klik elemen pada grafik atau gunakan opsi filter untuk menyaring data secara interaktif.</div>
+  </div>
+  <div class="update-info">
+    <div>Diperbarui:</div>
+    <strong id="waktu-update">-</strong>
+  </div>
+</div>
 
-  <script type="text/babel">
-    const { useState } = React;
-    const { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } = Recharts;
+<!-- Ringkasan KPI Cards -->
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-title">Total Berita Tampil</div>
+    <div class="kpi-value" id="kpi-total">0</div>
+    <div class="kpi-sub" id="kpi-total-sub">Dari total 0 berita</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-title">Sentimen Positif</div>
+    <div class="kpi-value" style="color: #3fb950;" id="kpi-positif">0%</div>
+    <div class="kpi-sub" id="kpi-positif-count">0 berita</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-title">Sentimen Negatif</div>
+    <div class="kpi-value" style="color: #f85149;" id="kpi-negatif">0%</div>
+    <div class="kpi-sub" id="kpi-negatif-count">0 berita</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-title">Media Dominan</div>
+    <div class="kpi-value" style="font-size: 16px; font-weight: 600;" id="kpi-media-top">-</div>
+    <div class="kpi-sub" id="kpi-media-sub">0 berita</div>
+  </div>
+</div>
 
-    // 1. Tombol Ekspor Excel (Dinamis Theme)
-    const ExcelExportButton = ({ theme, onClick }) => {
-      const isDark = theme === 'dark';
+<div class="grafik-grid">
+  <div class="kartu-grafik">
+    <h2>Jumlah Berita / Hari</h2>
+    <canvas id="grafik-per-hari"></canvas>
+    <div class="petunjuk">Klik batang untuk filter tanggal.</div>
+  </div>
+  <div class="kartu-grafik">
+    <h2>Distribusi Media</h2>
+    <canvas id="grafik-media"></canvas>
+    <div class="petunjuk">Klik segmen untuk filter media.</div>
+  </div>
+  <div class="kartu-grafik">
+    <h2>Sentimen AI (IndoBERT)</h2>
+    <canvas id="grafik-sentimen"></canvas>
+    <div class="petunjuk">Klik segmen untuk filter sentimen.</div>
+  </div>
+  <div class="kartu-grafik">
+    <h2>Top Kategori</h2>
+    <canvas id="grafik-per-kategori"></canvas>
+    <div class="petunjuk">Klik batang untuk filter kategori.</div>
+  </div>
+</div>
 
-      return (
-        <button 
-          onClick={onClick}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
-            isDark 
-              ? 'bg-emerald-950/60 text-emerald-400 hover:bg-emerald-900/80 border border-emerald-800/60' 
-              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-          }`}
-        >
-          <svg 
-            className={`w-5 h-5 ${isDark ? 'fill-emerald-400' : 'fill-emerald-600'}`} 
-            viewBox="0 0 24 24"
-          >
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6zm10.2-7.2l-1.6 2.4 1.6 2.4h-1.7l-1-1.6-1 1.6h-1.7l1.6-2.4-1.6-2.4h1.7l1 1.5 1-1.5h1.7z"/>
-          </svg>
-          <span>Ekspor Excel</span>
-        </button>
-      );
-    };
+<div class="kontrol">
+  <!-- Filter Tanggal -->
+  <select id="pilih-tanggal"><option value="">Semua Tanggal</option></select>
+  
+  <!-- Filter Media -->
+  <select id="pilih-media"><option value="">Semua Media</option></select>
 
-    // 2. Custom Tooltip (Jumlah & Persentase)
-    const CustomTooltip = ({ active, payload, label, totalData }) => {
-      if (active && payload && payload.length) {
-        const value = payload[0].value;
-        const percentage = totalData > 0 ? ((value / totalData) * 100).toFixed(1) : 0;
+  <!-- Filter Sentimen -->
+  <select id="pilih-sentimen">
+    <option value="">Semua Sentimen</option>
+    <option value="Positif">Positif</option>
+    <option value="Netral">Netral</option>
+    <option value="Negatif">Negatif</option>
+  </select>
 
-        return (
-          <div className="bg-gray-900 text-white p-3 rounded-lg shadow-lg border border-gray-700 text-xs">
-            <p className="font-semibold text-gray-300 mb-1">{label}</p>
-            <p className="text-emerald-400 font-bold">
-              Jumlah: {value.toLocaleString('id-ID')}
-            </p>
-            <p className="text-gray-400 mt-0.5">
-              Porsi: {percentage}% dari total
-            </p>
-          </div>
-        );
+  <!-- Filter Kategori -->
+  <select id="pilih-kategori"><option value="">Semua Kategori</option></select>
+
+  <!-- Pencarian Bebas -->
+  <input type="text" id="cari" placeholder="Cari kata kunci...">
+
+  <!-- Switch Mode View dengan Ikon SVG Bertema -->
+  <div class="group-view">
+    <button id="btn-view-table" class="aktif" title="Tampilan Tabel">
+      <svg viewBox="0 0 16 16"><path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v2.5h13v-2.5a.25.25 0 0 0-.25-.25Zm13 4h-13v3h13Zm0 4.5h-13v3.75c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25Z"/></svg>
+      Tabel
+    </button>
+    <button id="btn-view-card" title="Tampilan Kartu">
+      <svg viewBox="0 0 16 16"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5ZM9 2.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5ZM1 10.5A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5ZM9 10.5A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5Z"/></svg>
+      Kartu
+    </button>
+  </div>
+
+  <button id="reset-filter">Reset Filter</button>
+  <button id="btn-export-excel" class="btn-export">📥 Ekspor Excel</button>
+</div>
+
+<div id="filter-aktif"></div>
+<div id="status">Memuat data...</div>
+<div id="tabel-wrap"></div>
+
+<script>
+let semuaData = [];        
+let filterTanggal = null;  
+let filterKategori = null; 
+let filterSentimen = null; 
+let filterMedia = null;
+let modeView = 'table'; 
+
+let kolomUrut = null;
+let arahUrut = 1;
+
+let chartHari = null;
+let chartMedia = null;
+let chartKategori = null;
+let chartSentimen = null;
+
+const elPilihTanggal = document.getElementById('pilih-tanggal');
+const elPilihMedia = document.getElementById('pilih-media');
+const elPilihSentimen = document.getElementById('pilih-sentimen');
+const elPilihKategori = document.getElementById('pilih-kategori');
+const elCari = document.getElementById('cari');
+const elStatus = document.getElementById('status');
+const elTabelWrap = document.getElementById('tabel-wrap');
+const elFilterAktif = document.getElementById('filter-aktif');
+const elResetFilter = document.getElementById('reset-filter');
+const elWaktuUpdate = document.getElementById('waktu-update');
+const elBtnExportExcel = document.getElementById('btn-export-excel');
+
+const btnViewTable = document.getElementById('btn-view-table');
+const btnViewCard = document.getElementById('btn-view-card');
+
+const WARNA_NORMAL = '#30363d';
+const WARNA_AKTIF = '#58a6ff';
+const OPSI_WARNA = ['#58a6ff', '#3fb950', '#f0883e', '#db61a2', '#a371f7', '#e3b341', '#79c0ff', '#56d364'];
+const WARNA_SENTIMEN = { 'Positif': '#238636', 'Negatif': '#da3633', 'Netral': '#8b949e' };
+
+// ---------- MUAT DATA ----------
+
+async function muatSemuaData() {
+  try {
+    const res = await fetch('data/index.json?_=' + Date.now());
+    if (!res.ok) throw new Error('index.json tidak ditemukan');
+    
+    // Ambil Header Last-Modified atau gunakan Waktu Sekarang
+    const lastModified = res.headers.get('Last-Modified');
+    if (lastModified) {
+      elWaktuUpdate.textContent = new Date(lastModified).toLocaleString('id-ID');
+    } else {
+      elWaktuUpdate.textContent = new Date().toLocaleString('id-ID');
+    }
+
+    const daftar = await res.json();  
+
+    if (daftar.length === 0) {
+      elStatus.textContent = 'Belum ada file berita tersedia.';
+      return;
+    }
+
+    elPilihTanggal.innerHTML = '<option value="">Semua Tanggal</option>' +
+      daftar.map(d => `<option value="${d.tanggal}">${d.tanggal}</option>`).join('');
+
+    elStatus.textContent = `Memuat ${daftar.length} file...`;
+
+    const hasil = await Promise.all(daftar.map(async d => {
+      try {
+        const r = await fetch('data/' + d.file + '?_=' + Date.now());
+        if (!r.ok) return [];
+        const buffer = await r.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const baris = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        return baris.map(b => ({ ...b, _tanggalFile: d.tanggal }));
+      } catch (e) {
+        return [];
       }
-      return null;
-    };
+    }));
 
-    // 3. Komponen Bar Chart Reusable
-    const NewsBarChart = ({ title, data, dataKey = "value", categoryKey = "name", color = "#10B981" }) => {
-      const totalData = data.reduce((acc, curr) => acc + curr[dataKey], 0);
+    semuaData = hasil.flat();
 
-      return (
-        <div className="p-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">{title}</h3>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                <XAxis dataKey={categoryKey} stroke="#888888" fontSize={12} />
-                <YAxis stroke="#888888" fontSize={12} />
-                <Tooltip content={<CustomTooltip totalData={totalData} />} />
-                <Bar dataKey={dataKey} fill={color} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+    populateFilterOptions();
+    renderSemua();
+  } catch (e) {
+    elStatus.textContent = 'Gagal memuat data: ' + e.message;
+  }
+}
+
+function populateFilterOptions() {
+  const mediaSet = new Set();
+  const kategoriSet = new Set();
+
+  semuaData.forEach(b => {
+    if (b['Media']) mediaSet.add(String(b['Media']).trim());
+    pecahKategori(b).forEach(k => kategoriSet.add(k));
+  });
+
+  elPilihMedia.innerHTML = '<option value="">Semua Media</option>' +
+    Array.from(mediaSet).sort().map(m => `<option value="${m}">${m}</option>`).join('');
+
+  elPilihKategori.innerHTML = '<option value="">Semua Kategori</option>' +
+    Array.from(kategoriSet).sort().map(k => `<option value="${k}">${k}</option>`).join('');
+}
+
+// ---------- FUNGSI FILTER & UTILITY ----------
+
+function bersihkanNilai(val) {
+  if (!val || String(val).trim() === '' || String(val).toLowerCase() === 'undefined') {
+    return 'tidak ditemukan';
+  }
+  return String(val).trim();
+}
+
+function cocokPencarian(baris, kataKunci) {
+  if (!kataKunci) return true;
+  return Object.values(baris).some(v => String(v).toLowerCase().includes(kataKunci));
+}
+
+function pecahKategori(baris) {
+  const mentah = String(baris['Kategori'] ?? '').trim();
+  if (!mentah) return [];
+  return mentah.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function dataTersaring() {
+  const kataKunci = elCari.value.trim().toLowerCase();
+  return semuaData.filter(b => {
+    if (!cocokPencarian(b, kataKunci)) return false;
+    if (filterTanggal && b._tanggalFile !== filterTanggal) return false;
+    if (filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
+    if (filterSentimen && String(b['Sentimen'] ?? '').trim() !== filterSentimen) return false;
+    if (filterMedia && String(b['Media'] ?? '').trim() !== filterMedia) return false;
+    return true;
+  });
+}
+
+function dataAbaikanFilter(field) {
+  const kataKunci = elCari.value.trim().toLowerCase();
+  return semuaData.filter(b => {
+    if (!cocokPencarian(b, kataKunci)) return false;
+    if (field !== 'tanggal' && filterTanggal && b._tanggalFile !== filterTanggal) return false;
+    if (field !== 'kategori' && filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
+    if (field !== 'sentimen' && filterSentimen && String(b['Sentimen'] ?? '').trim() !== filterSentimen) return false;
+    if (field !== 'media' && filterMedia && String(b['Media'] ?? '').trim() !== filterMedia) return false;
+    return true;
+  });
+}
+
+// ---------- RENDER KPI CARDS ----------
+
+function renderKPICards(data) {
+  const totalTampil = data.length;
+  const totalKeseluruhan = semuaData.length;
+  
+  document.getElementById('kpi-total').textContent = totalTampil;
+  document.getElementById('kpi-total-sub').textContent = `Dari total ${totalKeseluruhan} berita`;
+
+  if (totalTampil === 0) {
+    document.getElementById('kpi-positif').textContent = '0%';
+    document.getElementById('kpi-positif-count').textContent = '0 berita';
+    document.getElementById('kpi-negatif').textContent = '0%';
+    document.getElementById('kpi-negatif-count').textContent = '0 berita';
+    document.getElementById('kpi-media-top').textContent = '-';
+    document.getElementById('kpi-media-sub').textContent = '0 berita';
+    return;
+  }
+
+  let countPos = 0;
+  let countNeg = 0;
+  const mediaCount = {};
+
+  data.forEach(b => {
+    const s = String(b['Sentimen'] || '').trim();
+    if (s === 'Positif') countPos++;
+    else if (s === 'Negatif') countNeg++;
+
+    const m = bersihkanNilai(b['Media']);
+    if (m !== 'tidak ditemukan') {
+      mediaCount[m] = (mediaCount[m] || 0) + 1;
+    }
+  });
+
+  const pctPos = ((countPos / totalTampil) * 100).toFixed(1);
+  const pctNeg = ((countNeg / totalTampil) * 100).toFixed(1);
+
+  document.getElementById('kpi-positif').textContent = `${pctPos}%`;
+  document.getElementById('kpi-positif-count').textContent = `${countPos} berita`;
+  
+  document.getElementById('kpi-negatif').textContent = `${pctNeg}%`;
+  document.getElementById('kpi-negatif-count').textContent = `${countNeg} berita`;
+
+  const topMediaEntry = Object.entries(mediaCount).sort((a, b) => b[1] - a[1])[0];
+  if (topMediaEntry) {
+    document.getElementById('kpi-media-top').textContent = topMediaEntry[0];
+    document.getElementById('kpi-media-sub').textContent = `${topMediaEntry[1]} berita (${((topMediaEntry[1]/totalTampil)*100).toFixed(1)}%)`;
+  } else {
+    document.getElementById('kpi-media-top').textContent = '-';
+    document.getElementById('kpi-media-sub').textContent = '0 berita';
+  }
+}
+
+// ---------- RENDER GRAFIK ----------
+
+function renderGrafikPerHari() {
+  const data = dataAbaikanFilter('tanggal');
+  const hitung = {};
+  for (const b of data) {
+    hitung[b._tanggalFile] = (hitung[b._tanggalFile] || 0) + 1;
+  }
+  const label = Object.keys(hitung).sort();
+  const nilai = label.map(l => hitung[l]);
+  const warna = label.map(l => l === filterTanggal ? WARNA_AKTIF : WARNA_NORMAL);
+
+  const ctx = document.getElementById('grafik-per-hari');
+  if (chartHari) chartHari.destroy();
+  chartHari = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: label,
+      datasets: [{ label: 'Berita', data: nilai, backgroundColor: warna, borderRadius: 4 }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
+        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true }
+      },
+      onClick: (evt, elemen) => {
+        if (elemen.length === 0) return;
+        const tgl = label[elemen[0].index];
+        filterTanggal = (filterTanggal === tgl) ? null : tgl;
+        elPilihTanggal.value = filterTanggal || '';
+        renderSemua();
+      }
+    }
+  });
+}
+
+function renderGrafikMedia() {
+  const data = dataAbaikanFilter('media');
+  const hitung = {};
+  for (const b of data) {
+    const m = bersihkanNilai(b['Media']);
+    hitung[m] = (hitung[m] || 0) + 1;
+  }
+  const label = Object.keys(hitung);
+  const nilai = Object.values(hitung);
+  const bgWarna = label.map((l, i) => filterMedia ? (l === filterMedia ? WARNA_AKTIF : WARNA_NORMAL) : OPSI_WARNA[i % OPSI_WARNA.length]);
+
+  const ctx = document.getElementById('grafik-media');
+  if (chartMedia) chartMedia.destroy();
+  chartMedia = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: label,
+      datasets: [{ data: nilai, backgroundColor: bgWarna, borderWidth: 1, borderColor: '#161b22' }]
+    },
+    options: {
+      responsive: true,
+      plugins: { 
+        legend: { labels: { color: '#c9d1d9', font: { size: 10 } }, position: 'bottom' }
+      },
+      onClick: (evt, elemen) => {
+        if (elemen.length === 0) return;
+        const mediaDiklik = label[elemen[0].index];
+        filterMedia = (filterMedia === mediaDiklik) ? null : mediaDiklik;
+        elPilihMedia.value = filterMedia || '';
+        renderSemua();
+      }
+    }
+  });
+}
+
+function renderGrafikSentimen() {
+  const data = dataAbaikanFilter('sentimen');
+  const hitung = { 'Positif': 0, 'Netral': 0, 'Negatif': 0 };
+  
+  for (const b of data) {
+    const s = String(b['Sentimen'] || 'Netral').trim();
+    if (hitung[s] !== undefined) hitung[s]++;
+    else hitung['Netral']++;
+  }
+
+  const label = Object.keys(hitung);
+  const nilai = Object.values(hitung);
+  const bgWarna = label.map(l => {
+    if (filterSentimen) return l === filterSentimen ? WARNA_SENTIMEN[l] : WARNA_NORMAL;
+    return WARNA_SENTIMEN[l];
+  });
+
+  const ctx = document.getElementById('grafik-sentimen');
+  if (chartSentimen) chartSentimen.destroy();
+  chartSentimen = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: label,
+      datasets: [{ data: nilai, backgroundColor: bgWarna, borderWidth: 1, borderColor: '#161b22' }]
+    },
+    options: {
+      responsive: true,
+      plugins: { 
+        legend: { labels: { color: '#c9d1d9', font: { size: 10 } }, position: 'bottom' }
+      },
+      onClick: (evt, elemen) => {
+        if (elemen.length === 0) return;
+        const sentimenDiklik = label[elemen[0].index];
+        filterSentimen = (filterSentimen === sentimenDiklik) ? null : sentimenDiklik;
+        elPilihSentimen.value = filterSentimen || '';
+        renderSemua();
+      }
+    }
+  });
+}
+
+function renderGrafikPerKategori() {
+  const data = dataAbaikanFilter('kategori');
+  const hitung = {};
+  for (const b of data) {
+    for (const k of pecahKategori(b)) {
+      hitung[k] = (hitung[k] || 0) + 1;
+    }
+  }
+  const entri = Object.entries(hitung).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const label = entri.map(e => e[0]);
+  const nilai = entri.map(e => e[1]);
+  const warna = label.map((l, i) => {
+    if (filterKategori) return l === filterKategori ? WARNA_AKTIF : WARNA_NORMAL;
+    return OPSI_WARNA[i % OPSI_WARNA.length];
+  });
+
+  const ctx = document.getElementById('grafik-per-kategori');
+  if (chartKategori) chartKategori.destroy();
+  chartKategori = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: label,
+      datasets: [{ label: 'Berita', data: nilai, backgroundColor: warna, borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true },
+        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } }
+      },
+      onClick: (evt, elemen) => {
+        if (elemen.length === 0) return;
+        const kateg = label[elemen[0].index];
+        filterKategori = (filterKategori === kateg) ? null : kateg;
+        elPilihKategori.value = filterKategori || '';
+        renderSemua();
+      }
+    }
+  });
+}
+
+// ---------- CHIP FILTER ----------
+
+function renderChipFilter() {
+  const chip = [];
+  if (filterTanggal) {
+    chip.push(`<span class="chip">Tanggal: ${filterTanggal} <button onclick="hapusFilterTanggal()">✕</button></span>`);
+  }
+  if (filterMedia) {
+    chip.push(`<span class="chip">Media: ${filterMedia} <button onclick="hapusFilterMedia()">✕</button></span>`);
+  }
+  if (filterSentimen) {
+    chip.push(`<span class="chip">Sentimen: ${filterSentimen} <button onclick="hapusFilterSentimen()">✕</button></span>`);
+  }
+  if (filterKategori) {
+    chip.push(`<span class="chip">Kategori: ${filterKategori} <button onclick="hapusFilterKategori()">✕</button></span>`);
+  }
+  elFilterAktif.innerHTML = chip.join('');
+}
+
+function hapusFilterTanggal() { filterTanggal = null; elPilihTanggal.value = ''; renderSemua(); }
+function hapusFilterMedia() { filterMedia = null; elPilihMedia.value = ''; renderSemua(); }
+function hapusFilterSentimen() { filterSentimen = null; elPilihSentimen.value = ''; renderSemua(); }
+function hapusFilterKategori() { filterKategori = null; elPilihKategori.value = ''; renderSemua(); }
+
+// ---------- RENDER TAMPILAN ----------
+
+function renderTampilanUtama() {
+  let data = dataTersaring();
+
+  if (kolomUrut) {
+    data.sort((a, b) => {
+      const va = String(a[kolomUrut] ?? '');
+      const vb = String(b[kolomUrut] ?? '');
+      return va.localeCompare(vb, 'id') * arahUrut;
+    });
+  }
+
+  renderKPICards(data);
+  elStatus.textContent = `${data.length} berita ditampilkan (dari total ${semuaData.length})`;
+
+  if (data.length === 0) {
+    elTabelWrap.innerHTML = '<p style="color:#8b949e">Tidak ada data yang cocok.</p>';
+    return;
+  }
+
+  if (modeView === 'table') {
+    renderTabel(data);
+  } else {
+    renderKartu(data);
+  }
+}
+
+// Render Tabel
+function renderTabel(data) {
+  const kolom = Object.keys(semuaData[0]).filter(k => k !== '_tanggalFile' && k !== 'Link');
+
+  let html = '<table><thead><tr>';
+  for (const k of kolom) {
+    let panah = '';
+    if (kolomUrut === k) panah = arahUrut === 1 ? ' ▲' : ' ▼';
+    html += `<th data-kolom="${k}">${k}<span class="panah">${panah}</span></th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const baris of data) {
+    html += '<tr>';
+    for (const k of kolom) {
+      let nilai = baris[k];
+      const linkBerita = baris['Link'] || '#';
+
+      if (k === 'Judul' && nilai) {
+        html += `<td><a href="${linkBerita}" target="_blank" rel="noopener"><strong>${nilai}</strong></a></td>`;
+      } else if (k === 'Penulis' || k === 'Author') {
+        const valPenulis = bersihkanNilai(nilai);
+        if (valPenulis === 'tidak ditemukan') {
+          html += `<td><span class="tidak-ditemukan">tidak ditemukan</span></td>`;
+        } else {
+          html += `<td>${valPenulis}</td>`;
+        }
+      } else if (k === 'URL Gambar' && nilai) {
+        html += `<td><a href="${linkBerita}" target="_blank" rel="noopener"><img src="${nilai}" loading="lazy" alt="gambar" onerror="this.style.display='none'"></a></td>`;
+      } else if (k === 'Sentimen') {
+        let cls = 'badge-net';
+        if (nilai === 'Positif') cls = 'badge-pos';
+        else if (nilai === 'Negatif') cls = 'badge-neg';
+        html += `<td><span class="${cls}">${nilai}</span></td>`;
+      } else {
+        html += `<td>${String(nilai ?? '')}</td>`;
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  elTabelWrap.innerHTML = html;
+
+  elTabelWrap.querySelectorAll('th').forEach(th => {
+    th.addEventListener('click', () => {
+      const k = th.dataset.kolom;
+      if (kolomUrut === k) {
+        arahUrut *= -1;
+      } else {
+        kolomUrut = k;
+        arahUrut = 1;
+      }
+      renderTampilanUtama();
+    });
+  });
+}
+
+// Render Kartu (Card View)
+function renderKartu(data) {
+  let html = '<div class="card-grid">';
+
+  for (const baris of data) {
+    const judul = baris['Judul'] || 'Tanpa Judul';
+    const media = bersihkanNilai(baris['Media']);
+    const penulis = bersihkanNilai(baris['Penulis'] || baris['Author']);
+    const tanggal = baris['Tanggal'] || baris._tanggalFile || '';
+    const gambar = baris['URL Gambar'] || '';
+    const ringkasan = baris['Ringkasan'] || baris['Isi'] || '';
+    const sentimen = baris['Sentimen'] || 'Netral';
+    const link = baris['Link'] || '#';
+
+    let cls = 'badge-net';
+    if (sentimen === 'Positif') cls = 'badge-pos';
+    else if (sentimen === 'Negatif') cls = 'badge-neg';
+
+    html += `
+      <div class="news-card">
+        <div>
+          ${gambar ? `<a href="${link}" target="_blank" rel="noopener"><img src="${gambar}" loading="lazy" alt="gambar" onerror="this.style.display='none'"></a>` : ''}
+          <div class="card-meta">
+            <span><strong>${media}</strong> • ${tanggal}</span>
+            <span class="${cls}">${sentimen}</span>
           </div>
+          <div class="card-title">
+            <a href="${link}" target="_blank" rel="noopener">${judul}</a>
+          </div>
+          <div style="font-size:11px; color:#8b949e; margin-bottom:8px;">
+            Penulis: ${penulis === 'tidak ditemukan' ? '<span class="tidak-ditemukan">tidak ditemukan</span>' : penulis}
+          </div>
+          ${ringkasan ? `<div class="card-desc">${ringkasan}</div>` : ''}
         </div>
-      );
-    };
-
-    // 4. Main App Component
-    const App = () => {
-      const [theme, setTheme] = useState('dark');
-
-      const toggleTheme = () => {
-        const newTheme = theme === 'dark' ? 'light' : 'dark';
-        setTheme(newTheme);
-        document.documentElement.classList.toggle('dark');
-      };
-
-      // Data KPI (Lama + Baru)
-      const kpiList = [
-        // KPI Tambahan Baru
-        { title: 'Jumlah Berita', value: '1,250', icon: '📰' },
-        { title: 'Jumlah Media', value: '48', icon: '🌐' },
-        { title: 'Jumlah Kategori', value: '12', icon: '🏷️' },
-        // KPI Eksisting / Komponen Lama
-        { title: 'Total Jangkauan (Reach)', value: '3.4M', icon: '📈' },
-        { title: 'Sentimen Positif', value: '62%', icon: '😊' },
-        { title: 'Share of Voice', value: '28.5%', icon: '📢' },
-      ];
-
-      // Data Grafik Bar
-      const beritaPerHari = [
-        { name: '01 Aug', value: 120 },
-        { name: '02 Aug', value: 200 },
-        { name: '03 Aug', value: 150 },
-        { name: '04 Aug', value: 300 },
-        { name: '05 Aug', value: 250 },
-      ];
-
-      const beritaPerMedia = [
-        { name: 'Detik', value: 450 },
-        { name: 'Kompas', value: 320 },
-        { name: 'Tempo', value: 210 },
-        { name: 'Antara', value: 180 },
-        { name: 'Kumparan', value: 90 },
-      ];
-
-      const beritaPerSentimen = [
-        { name: 'Positif', value: 650 },
-        { name: 'Netral', value: 400 },
-        { name: 'Negatif', value: 200 },
-      ];
-
-      const beritaPerKategori = [
-        { name: 'Politik', value: 400 },
-        { name: 'Ekonomi', value: 300 },
-        { name: 'Teknologi', value: 250 },
-        { name: 'Hukum', value: 180 },
-        { name: 'Sosial', value: 120 },
-      ];
-
-      return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="flex flex-wrap justify-between items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Monitoring Media</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Analisis sebaran berita, media, dan sentimen publik</p>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={toggleTheme} 
-                className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-xs font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition"
-              >
-                {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
-              </button>
-              
-              {/* Tombol Ekspor Excel Tambahan */}
-              <ExcelExportButton theme={theme} onClick={() => alert('Proses ekspor Excel dimulai...')} />
-            </div>
-          </div>
-
-          {/* Grid KPI Cards (KPI Lama + KPI Baru) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {kpiList.map((kpi, idx) => (
-              <div 
-                key={idx} 
-                className="p-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm"
-              >
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    {kpi.title}
-                  </span>
-                  <span className="text-2xl">{kpi.icon}</span>
-                </div>
-                <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                  {kpi.value}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Grid Grafik Bar (4 Jenis Grafik) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <NewsBarChart title="Jumlah Berita Per Hari" data={beritaPerHari} color="#3B82F6" />
-            <NewsBarChart title="Jumlah Berita Per Media" data={beritaPerMedia} color="#8B5CF6" />
-            <NewsBarChart title="Jumlah Berita Per Sentimen" data={beritaPerSentimen} color="#10B981" />
-            <NewsBarChart title="Jumlah Berita Per Kategori" data={beritaPerKategori} color="#F59E0B" />
-          </div>
+        <div class="card-footer">
+          <span style="font-size:11px; color:#8b949e;">${baris['Kategori'] || ''}</span>
+          <a href="${link}" target="_blank" rel="noopener" style="font-weight:600; font-size:12px;">Baca Selengkapnya →</a>
         </div>
-      );
-    };
+      </div>
+    `;
+  }
+  html += '</div>';
+  elTabelWrap.innerHTML = html;
+}
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
+// ---------- EKSPOR KE EXCEL ----------
+
+function eksporKeExcel() {
+  const data = dataTersaring();
+  if (data.length === 0) {
+    alert('Tidak ada data yang dapat diekspor.');
+    return;
+  }
+
+  // Bersihkan internal key (_tanggalFile)
+  const dataEkspor = data.map(item => {
+    const copy = { ...item };
+    delete copy._tanggalFile;
+    return copy;
+  });
+
+  const ws = XLSX.utils.json_to_sheet(dataEkspor);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Data Berita");
+  
+  const dateStr = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `Laporan_Berita_Tersaring_${dateStr}.xlsx`);
+}
+
+// ---------- RENDER UTAMA ----------
+
+function renderSemua() {
+  renderChipFilter();
+  renderGrafikPerHari();
+  renderGrafikMedia();
+  renderGrafikSentimen();
+  renderGrafikPerKategori();
+  renderTampilanUtama();
+}
+
+// ---------- EVENT LISTENER ----------
+
+elPilihTanggal.addEventListener('change', () => { filterTanggal = elPilihTanggal.value || null; renderSemua(); });
+elPilihMedia.addEventListener('change', () => { filterMedia = elPilihMedia.value || null; renderSemua(); });
+elPilihSentimen.addEventListener('change', () => { filterSentimen = elPilihSentimen.value || null; renderSemua(); });
+elPilihKategori.addEventListener('change', () => { filterKategori = elPilihKategori.value || null; renderSemua(); });
+
+elCari.addEventListener('input', renderSemua);
+
+btnViewTable.addEventListener('click', () => {
+  modeView = 'table';
+  btnViewTable.classList.add('aktif');
+  btnViewCard.classList.remove('aktif');
+  renderTampilanUtama();
+});
+
+btnViewCard.addEventListener('click', () => {
+  modeView = 'card';
+  btnViewCard.classList.add('aktif');
+  btnViewTable.classList.remove('aktif');
+  renderTampilanUtama();
+});
+
+elResetFilter.addEventListener('click', () => {
+  filterTanggal = null;
+  filterKategori = null;
+  filterSentimen = null;
+  filterMedia = null;
+  elPilihTanggal.value = '';
+  elPilihMedia.value = '';
+  elPilihSentimen.value = '';
+  elPilihKategori.value = '';
+  elCari.value = '';
+  renderSemua();
+});
+
+elBtnExportExcel.addEventListener('click', eksporKeExcel);
+
+muatSemuaData();
+</script>
+
 </body>
 </html>
