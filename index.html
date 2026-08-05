@@ -35,6 +35,31 @@
     text-align: right;
   }
 
+  /* Ringkasan KPI Cards */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 500px) {
+    .kpi-grid { grid-template-columns: 1fr; }
+  }
+  .kpi-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+  }
+  .kpi-title { font-size: 12px; color: #8b949e; margin-bottom: 6px; }
+  .kpi-value { font-size: 22px; font-weight: 700; color: #e6edf3; }
+  .kpi-sub { font-size: 11px; color: #6e7681; margin-top: 4px; }
+
   /* Kontrol & Filter */
   .kontrol {
     display: flex;
@@ -53,6 +78,16 @@
   }
   button { cursor: pointer; }
   button:hover { background: #21262d; }
+  
+  .btn-export {
+    background: #238636;
+    color: #ffffff;
+    border: 1px solid #2ea043;
+    font-weight: 600;
+  }
+  .btn-export:hover {
+    background: #2ea043;
+  }
   
   /* Styling Ikon Switch View Bertema */
   .group-view {
@@ -234,6 +269,30 @@
   </div>
 </div>
 
+<!-- Ringkasan KPI Cards -->
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-title">Total Berita Tampil</div>
+    <div class="kpi-value" id="kpi-total">0</div>
+    <div class="kpi-sub" id="kpi-total-sub">Dari total 0 berita</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-title">Sentimen Positif</div>
+    <div class="kpi-value" style="color: #3fb950;" id="kpi-positif">0%</div>
+    <div class="kpi-sub" id="kpi-positif-count">0 berita</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-title">Sentimen Negatif</div>
+    <div class="kpi-value" style="color: #f85149;" id="kpi-negatif">0%</div>
+    <div class="kpi-sub" id="kpi-negatif-count">0 berita</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-title">Media Dominan</div>
+    <div class="kpi-value" style="font-size: 16px; font-weight: 600;" id="kpi-media-top">-</div>
+    <div class="kpi-sub" id="kpi-media-sub">0 berita</div>
+  </div>
+</div>
+
 <div class="grafik-grid">
   <div class="kartu-grafik">
     <h2>Jumlah Berita / Hari</h2>
@@ -291,6 +350,7 @@
   </div>
 
   <button id="reset-filter">Reset Filter</button>
+  <button id="btn-export-excel" class="btn-export">📥 Ekspor Excel</button>
 </div>
 
 <div id="filter-aktif"></div>
@@ -323,6 +383,7 @@ const elTabelWrap = document.getElementById('tabel-wrap');
 const elFilterAktif = document.getElementById('filter-aktif');
 const elResetFilter = document.getElementById('reset-filter');
 const elWaktuUpdate = document.getElementById('waktu-update');
+const elBtnExportExcel = document.getElementById('btn-export-excel');
 
 const btnViewTable = document.getElementById('btn-view-table');
 const btnViewCard = document.getElementById('btn-view-card');
@@ -440,6 +501,59 @@ function dataAbaikanFilter(field) {
     if (field !== 'media' && filterMedia && String(b['Media'] ?? '').trim() !== filterMedia) return false;
     return true;
   });
+}
+
+// ---------- RENDER KPI CARDS ----------
+
+function renderKPICards(data) {
+  const totalTampil = data.length;
+  const totalKeseluruhan = semuaData.length;
+  
+  document.getElementById('kpi-total').textContent = totalTampil;
+  document.getElementById('kpi-total-sub').textContent = `Dari total ${totalKeseluruhan} berita`;
+
+  if (totalTampil === 0) {
+    document.getElementById('kpi-positif').textContent = '0%';
+    document.getElementById('kpi-positif-count').textContent = '0 berita';
+    document.getElementById('kpi-negatif').textContent = '0%';
+    document.getElementById('kpi-negatif-count').textContent = '0 berita';
+    document.getElementById('kpi-media-top').textContent = '-';
+    document.getElementById('kpi-media-sub').textContent = '0 berita';
+    return;
+  }
+
+  let countPos = 0;
+  let countNeg = 0;
+  const mediaCount = {};
+
+  data.forEach(b => {
+    const s = String(b['Sentimen'] || '').trim();
+    if (s === 'Positif') countPos++;
+    else if (s === 'Negatif') countNeg++;
+
+    const m = bersihkanNilai(b['Media']);
+    if (m !== 'tidak ditemukan') {
+      mediaCount[m] = (mediaCount[m] || 0) + 1;
+    }
+  });
+
+  const pctPos = ((countPos / totalTampil) * 100).toFixed(1);
+  const pctNeg = ((countNeg / totalTampil) * 100).toFixed(1);
+
+  document.getElementById('kpi-positif').textContent = `${pctPos}%`;
+  document.getElementById('kpi-positif-count').textContent = `${countPos} berita`;
+  
+  document.getElementById('kpi-negatif').textContent = `${pctNeg}%`;
+  document.getElementById('kpi-negatif-count').textContent = `${countNeg} berita`;
+
+  const topMediaEntry = Object.entries(mediaCount).sort((a, b) => b[1] - a[1])[0];
+  if (topMediaEntry) {
+    document.getElementById('kpi-media-top').textContent = topMediaEntry[0];
+    document.getElementById('kpi-media-sub').textContent = `${topMediaEntry[1]} berita (${((topMediaEntry[1]/totalTampil)*100).toFixed(1)}%)`;
+  } else {
+    document.getElementById('kpi-media-top').textContent = '-';
+    document.getElementById('kpi-media-sub').textContent = '0 berita';
+  }
 }
 
 // ---------- RENDER GRAFIK ----------
@@ -636,6 +750,7 @@ function renderTampilanUtama() {
     });
   }
 
+  renderKPICards(data);
   elStatus.textContent = `${data.length} berita ditampilkan (dari total ${semuaData.length})`;
 
   if (data.length === 0) {
@@ -678,7 +793,7 @@ function renderTabel(data) {
           html += `<td>${valPenulis}</td>`;
         }
       } else if (k === 'URL Gambar' && nilai) {
-        html += `<td><a href="${linkBerita}" target="_blank" rel="noopener"><img src="${nilai}" loading="lazy" alt="gambar"></a></td>`;
+        html += `<td><a href="${linkBerita}" target="_blank" rel="noopener"><img src="${nilai}" loading="lazy" alt="gambar" onerror="this.style.display='none'"></a></td>`;
       } else if (k === 'Sentimen') {
         let cls = 'badge-net';
         if (nilai === 'Positif') cls = 'badge-pos';
@@ -728,7 +843,7 @@ function renderKartu(data) {
     html += `
       <div class="news-card">
         <div>
-          ${gambar ? `<a href="${link}" target="_blank" rel="noopener"><img src="${gambar}" loading="lazy" alt="gambar"></a>` : ''}
+          ${gambar ? `<a href="${link}" target="_blank" rel="noopener"><img src="${gambar}" loading="lazy" alt="gambar" onerror="this.style.display='none'"></a>` : ''}
           <div class="card-meta">
             <span><strong>${media}</strong> • ${tanggal}</span>
             <span class="${cls}">${sentimen}</span>
@@ -750,6 +865,30 @@ function renderKartu(data) {
   }
   html += '</div>';
   elTabelWrap.innerHTML = html;
+}
+
+// ---------- EKSPOR KE EXCEL ----------
+
+function eksporKeExcel() {
+  const data = dataTersaring();
+  if (data.length === 0) {
+    alert('Tidak ada data yang dapat diekspor.');
+    return;
+  }
+
+  // Bersihkan internal key (_tanggalFile)
+  const dataEkspor = data.map(item => {
+    const copy = { ...item };
+    delete copy._tanggalFile;
+    return copy;
+  });
+
+  const ws = XLSX.utils.json_to_sheet(dataEkspor);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Data Berita");
+  
+  const dateStr = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `Laporan_Berita_Tersaring_${dateStr}.xlsx`);
 }
 
 // ---------- RENDER UTAMA ----------
@@ -798,6 +937,8 @@ elResetFilter.addEventListener('click', () => {
   elCari.value = '';
   renderSemua();
 });
+
+elBtnExportExcel.addEventListener('click', eksporKeExcel);
 
 muatSemuaData();
 </script>
