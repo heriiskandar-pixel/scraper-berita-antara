@@ -183,7 +183,7 @@
     border: 1px solid var(--border-color);
     padding: 10px 12px;
     text-align: left;
-    vertical-align: top;
+    vertical-align: middle;
   }
   th {
     background: #10151c;
@@ -200,30 +200,36 @@
   a:hover { text-decoration: underline; }
   .panah { opacity: 0.5; font-size: 11px; margin-left: 4px; }
   
-  /* Style Gambar Thumbnail */
+  /* Thumbnail Gambar */
   .img-preview {
-    width: 140px;
-    height: 80px;
+    width: 120px;
+    height: 70px;
     object-fit: cover;
     border-radius: 6px;
     display: block;
     cursor: zoom-in;
     border: 1px solid var(--border-color);
+    background-color: #0d1117;
     transition: transform 0.2s, border-color 0.2s;
   }
   .img-preview:hover {
-    transform: scale(1.03);
+    transform: scale(1.05);
     border-color: var(--accent-blue);
   }
+  .no-img {
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-style: italic;
+  }
 
-  /* Modal Fullscreen Gambar */
+  /* Modal Fullscreen Lightbox */
   .modal-gambar {
     display: none;
     position: fixed;
     z-index: 1000;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    background-color: rgba(0, 0, 0, 0.85);
+    background-color: rgba(0, 0, 0, 0.88);
     backdrop-filter: blur(4px);
     justify-content: center;
     align-items: center;
@@ -231,9 +237,9 @@
   }
   .modal-gambar img {
     max-width: 90%;
-    max-height: 85vh;
+    max-height: 80vh;
     border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
   }
   .modal-close {
     position: absolute;
@@ -247,8 +253,11 @@
   }
   .modal-caption {
     color: var(--text-primary);
-    margin-top: 12px;
-    font-size: 13px;
+    margin-top: 14px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    padding: 0 20px;
   }
 </style>
 </head>
@@ -291,7 +300,7 @@
   <div class="kartu-grafik">
     <h2>Jumlah Berita per Media</h2>
     <canvas id="grafik-per-media"></canvas>
-    <div class="petunjuk">Klik batang/segmen untuk filter Media.</div>
+    <div class="petunjuk">Klik batang untuk filter Media.</div>
   </div>
   <div class="kartu-grafik">
     <h2>Jumlah Berita per Kategori</h2>
@@ -384,10 +393,7 @@ async function muatSemuaData() {
     }));
 
     semuaData = hasil.flat();
-    
-    // Inisialisasi Opsi Filter Media
     populasiOpsiMedia();
-    
     renderSemua();
   } catch (e) {
     elStatus.textContent = 'Gagal memuat data: ' + e.message;
@@ -395,7 +401,7 @@ async function muatSemuaData() {
 }
 
 function populasiOpsiMedia() {
-  const setMedia = new Set(semuaData.map(b => String(b['Media'] ?? '').trim()).filter(Boolean));
+  const setMedia = new Set(semuaData.map(b => String(b['Media'] ?? b['media'] ?? '').trim()).filter(Boolean));
   const listMedia = Array.from(setMedia).sort();
   elPilihMedia.innerHTML = '<option value="">Semua Media</option>' +
     listMedia.map(m => `<option value="${m}">${m}</option>`).join('');
@@ -409,9 +415,13 @@ function cocokPencarian(baris, kataKunci) {
 }
 
 function pecahKategori(baris) {
-  const mentah = String(baris['Kategori'] ?? '').trim();
+  const mentah = String(baris['Kategori'] ?? baris['kategori'] ?? '').trim();
   if (!mentah) return [];
   return mentah.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function ambilNilaiMedia(baris) {
+  return String(baris['Media'] ?? baris['media'] ?? '').trim();
 }
 
 function dataTersaring() {
@@ -419,7 +429,7 @@ function dataTersaring() {
   return semuaData.filter(b => {
     if (!cocokPencarian(b, kataKunci)) return false;
     if (filterTanggal && b._tanggalFile !== filterTanggal) return false;
-    if (filterMedia && String(b['Media'] ?? '').trim().toLowerCase() !== filterMedia.toLowerCase()) return false;
+    if (filterMedia && ambilNilaiMedia(b).toLowerCase() !== filterMedia.toLowerCase()) return false;
     if (filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
     return true;
   });
@@ -430,7 +440,7 @@ function dataUntukGrafik(abaikanFilter) {
   return semuaData.filter(b => {
     if (!cocokPencarian(b, kataKunci)) return false;
     if (abaikanFilter !== 'tanggal' && filterTanggal && b._tanggalFile !== filterTanggal) return false;
-    if (abaikanFilter !== 'media' && filterMedia && String(b['Media'] ?? '').trim().toLowerCase() !== filterMedia.toLowerCase()) return false;
+    if (abaikanFilter !== 'media' && filterMedia && ambilNilaiMedia(b).toLowerCase() !== filterMedia.toLowerCase()) return false;
     if (abaikanFilter !== 'kategori' && filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
     return true;
   });
@@ -439,7 +449,7 @@ function dataUntukGrafik(abaikanFilter) {
 function updateKPI(data) {
   document.getElementById('kpi-total').textContent = data.length.toLocaleString('id-ID');
 
-  const setMedia = new Set(data.map(b => String(b['Media'] ?? '').trim()).filter(Boolean));
+  const setMedia = new Set(data.map(b => ambilNilaiMedia(b)).filter(Boolean));
   document.getElementById('kpi-media').textContent = setMedia.size;
 
   const setKat = new Set();
@@ -493,8 +503,8 @@ function renderGrafikPerMedia() {
   const data = dataUntukGrafik('media');
   const hitung = {};
   for (const b of data) {
-    const m = String(b['Media'] ?? 'Lainnya').trim();
-    if (m) hitung[m] = (hitung[m] || 0) + 1;
+    const m = ambilNilaiMedia(b) || 'Lainnya';
+    hitung[m] = (hitung[m] || 0) + 1;
   }
   const entri = Object.entries(hitung).sort((a, b) => b[1] - a[1]);
   const label = entri.map(e => e[0]);
@@ -592,7 +602,7 @@ function hapusFilterTanggal() { filterTanggal = null; elPilihTanggal.value = '';
 function hapusFilterMedia() { filterMedia = null; elPilihMedia.value = ''; renderSemua(); }
 function hapusFilterKategori() { filterKategori = null; renderSemua(); }
 
-// ---------- RENDER TABEL & MODAL GAMBAR ----------
+// ---------- MODAL GAMBAR & TABEL ----------
 
 function bukaModalGambar(url, judul) {
   const modal = document.getElementById('modal-gambar');
@@ -606,6 +616,18 @@ function bukaModalGambar(url, judul) {
 
 function tutupModalGambar() {
   document.getElementById('modal-gambar').style.display = 'none';
+}
+
+// Cek apakah suatu nama kolom merupakan kolom gambar
+function isKolomGambar(namaKolom) {
+  const k = namaKolom.toLowerCase().trim();
+  return ['url gambar', 'gambar', 'url_gambar', 'image', 'url image', 'foto', 'thumbnail'].includes(k);
+}
+
+// Cek apakah suatu nama kolom merupakan kolom link
+function isKolomLink(namaKolom) {
+  const k = namaKolom.toLowerCase().trim();
+  return ['link', 'url', 'link berita', 'url berita'].includes(k);
 }
 
 function renderTabel(data) {
@@ -637,15 +659,22 @@ function renderTabel(data) {
   for (const baris of data) {
     html += '<tr>';
     for (const k of kolom) {
-      let nilai = baris[k];
-      let judulBerita = baris['Judul'] || baris['Title'] || '';
-      
-      if (k === 'Link' && nilai) {
+      let nilai = String(baris[k] ?? '').trim();
+      let judulBerita = baris['Judul'] || baris['judul'] || baris['Title'] || '';
+
+      if (isKolomLink(k) && nilai) {
         html += `<td><a href="${nilai}" target="_blank" rel="noopener">Buka Berita ↗</a></td>`;
-      } else if ((k === 'URL Gambar' || k === 'Gambar') && nilai) {
-        html += `<td><img src="${nilai}" class="img-preview" loading="lazy" alt="Gambar" onclick="bukaModalGambar('${nilai}', '${String(judulBerita).replace(/'/g, "\\'")}')"></td>`;
+      } else if (isKolomGambar(k)) {
+        if (nilai && (nilai.startsWith('http://') || nilai.startsWith('https://') || nilai.startsWith('data:image'))) {
+          const safeJudul = String(judulBerita).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          html += `<td><img src="${nilai}" class="img-preview" loading="lazy" alt="Gambar" 
+                      onerror="this.onerror=null; this.outerHTML='<span class=\\'no-img\\'>Gagal memuat</span>';"
+                      onclick="bukaModalGambar('${nilai}', '${safeJudul}')"></td>`;
+        } else {
+          html += `<td><span class="no-img">(Tidak ada gambar)</span></td>`;
+        }
       } else {
-        html += `<td>${String(nilai ?? '')}</td>`;
+        html += `<td>${nilai || '-'}</td>`;
       }
     }
     html += '</tr>';
@@ -700,7 +729,6 @@ elResetFilter.addEventListener('click', () => {
   renderSemua();
 });
 
-// ESC Key untuk menutup Modal Gambar Fullscreen
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') tutupModalGambar();
 });
