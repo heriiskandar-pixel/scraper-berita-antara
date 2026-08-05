@@ -2,8 +2,8 @@
 """
 scrape_berita_rss.py
 ====================
-Mengambil berita dari ANTARA News (RSS), Detik.com (RSS), dan Kompas.com (scraping cepat).
-Menyimpan hasil ke file Excel per tanggal terbit.
+Mengambil berita dari ANTARA News (RSS), Detik.com (RSS), dan Kompas.com (scraping).
+Menyimpan hasil ke file Excel per tanggal terbit dengan Ringkasan terisi.
 """
 
 import os
@@ -12,7 +12,7 @@ import time
 import json
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from html import unescape
 from xml.etree import ElementTree as ET
 from bs4 import BeautifulSoup
@@ -41,25 +41,34 @@ def parse_tanggal(raw):
     if not raw:
         return None
     try:
-        return parser.parse(str(raw), fuzzy=True)
+        dt = parser.parse(str(raw), fuzzy=True)
+        if dt.tzinfo is None:
+            wib = timezone(timedelta(hours=7))
+            dt = dt.replace(tzinfo=wib)
+        return dt
     except Exception:
         return None
+
+def format_tanggal_rfc2822(dt):
+    if not dt:
+        return ""
+    return dt.strftime("%a, %d %b %Y %H:%M:%S %z")
 
 # ----------------------------------------------------------------------
 # AMBIL RSS ANTARA & DETIK
 # ----------------------------------------------------------------------
 FEEDS = {
-    "antara-terkini": "https://www.antaranews.com/rss/terkini.xml",
-    "antara-politik": "https://www.antaranews.com/rss/politik.xml",
-    "detik-news": "https://news.detik.com/rss",
-    "detik-finance": "https://finance.detik.com/rss",
-    "detik-sport": "https://sport.detik.com/rss",
+    "antara-terkini": {"url": "https://www.antaranews.com/rss/terkini.xml", "media": "Antara", "kategori": "Terkini"},
+    "antara-politik": {"url": "https://www.antaranews.com/rss/politik.xml", "media": "Antara", "kategori": "Politik"},
+    "detik-news":     {"url": "https://news.detik.com/rss", "media": "Detik", "kategori": "News"},
+    "detik-finance":  {"url": "https://finance.detik.com/rss", "media": "Detik", "kategori": "Finance"},
+    "detik-sport":    {"url": "https://sport.detik.com/rss", "media": "Detik", "kategori": "Sport"},
 }
 
-def ambil_rss(nama_feed, url_feed):
+def ambil_rss(feed_info):
     hasil = []
     try:
-        resp = requests.get(url_feed, headers=HEADERS, timeout=20)
+        resp = requests.get(feed_info["url"], headers=HEADERS, timeout=20)
         resp.raise_for_status()
         root = ET.fromstring(resp.content)
         for item in root.findall(".//item"):
@@ -67,22 +76,26 @@ def ambil_rss(nama_feed, url_feed):
             link = (item.findtext("link") or "").strip()
             tanggal = (item.findtext("pubDate") or "").strip()
             deskripsi = clean_html(item.findtext("description") or "")
+            
+            cat_xml = item.findtext("category")
+            kategori_berita = cat_xml.strip().capitalize() if cat_xml else feed_info["kategori"]
+
             hasil.append({
-                "Kategori": nama_feed,
+                "Kategori": kategori_berita,
                 "Judul": judul,
                 "Tanggal Terbit": tanggal,
                 "Penulis": "",
                 "Ringkasan": deskripsi,
                 "Link": link,
                 "URL Gambar": "",
-                "Media": "rss"
+                "Media": feed_info["media"]
             })
     except Exception as e:
-        print(f"Gagal ambil RSS {nama_feed}: {e}")
+        print(f"Gagal ambil RSS {feed_info['media']} ({feed_info['kategori']}): {e}")
     return hasil
 
 # ----------------------------------------------------------------------
-# SCRAPING KOMPAS.COM (VERSI CEPAT/OPTIMIZED)
+# SCRAPING KOMPAS.COM (DENGAN EKSTRAKSI RINGKASAN)
 # ----------------------------------------------------------------------
 def ambil_kompas(max_artikel=30):
     hasil = []
@@ -100,7 +113,6 @@ def ambil_kompas(max_artikel=30):
             continue
 
         soup = BeautifulSoup(resp.text, 'lxml')
-        # Tangkap semua tag <a> yang memiliki pola URL berita Kompas
         link_candidates = soup.find_all('a', href=re.compile(r'/read/\d{4}/\d{2}/\d{2}/'))
 
         for a in link_candidates:
@@ -108,35 +120,60 @@ def ambil_kompas(max_artikel=30):
             if not link or link in seen_links:
                 continue
             
-            # Normalisasi URL jika berupa path relatif
             if link.startswith("//"):
                 link = "https:" + link
             elif link.startswith("/"):
                 link = "https://www.kompas.com" + link
 
             judul = a.get_text(strip=True)
-            if len(judul) < 20:  # Filter judul pendek/tombol navigasi
+            if len(judul) < 20:
                 continue
 
-            # Ekstrak tanggal langsung dari struktur URL Kompas (/read/YYYY/MM/DD/...)
-            # Menghemat waktu karena tidak perlu request ke tiap halaman artikel
+            # Tanggal dari URL Kompas
             match_date = re.search(r'/read/(\d{4})/(\d{2})/(\d{2})/', link)
             if match_date:
                 thn, bln, tgl = match_date.groups()
-                tanggal = f"{thn}-{bln}-{tgl}"
+                tanggal = f"{thn}-{bln}-{tgl} 00:00:00 +0700"
             else:
                 tanggal = ""
 
+            # Kategori dari domain
+            subdomain_match = re.search(r'https://([a-zA-Z0-9-]+)\.kompas\.com', link)
+            if subdomain_match:
+                kat = subdomain_match.group(1).capitalize()
+                kategori = "Berita Utama" if kat in ["Www", "News"] else kat
+            else:
+                kategori = "General"
+
+            # AMBIL RINGKASAN (DESKRIPSI) DARI HALAMAN ARTIKEL
+            ringkasan = ""
+            try:
+                art_resp = requests.get(link, headers=HEADERS, timeout=5)
+                if art_resp.status_code == 200:
+                    art_soup = BeautifulSoup(art_resp.text, 'lxml')
+                    # Prioritas 1: Ambil dari meta description
+                    meta_desc = art_soup.find('meta', attrs={'name': 'description'}) or \
+                                art_soup.find('meta', attrs={'property': 'og:description'})
+                    if meta_desc and meta_desc.get('content'):
+                        ringkasan = meta_desc['content'].strip()
+                    else:
+                        # Prioritas 2: Paragraf pertama artikel
+                        p_first = art_soup.find('p')
+                        if p_first:
+                            ringkasan = p_first.get_text(strip=True)
+            except Exception:
+                pass  # Jika gagal, ringkasan tetap kosong tanpa menghentikan program
+
             seen_links.add(link)
             hasil.append({
-                "Kategori": "kompas",
+                "Kategori": kategori,
                 "Judul": judul,
                 "Tanggal Terbit": tanggal,
                 "Penulis": "",
-                "Ringkasan": "",
+                "Ringkasan": ringkasan,
                 "Link": link,
                 "URL Gambar": "",
-                "Media": "kompascom"
+                "Media": "Kompas"
             })
 
             if len(hasil) >= max_artikel:
@@ -168,14 +205,14 @@ def main():
     print("Mulai mengambil berita...\n")
     semua_berita = []
 
-    for nama_feed, url_feed in FEEDS.items():
-        print(f"- Mengambil RSS '{nama_feed}' ...", end=" ")
-        berita = ambil_rss(nama_feed, url_feed)
+    for key, feed_info in FEEDS.items():
+        print(f"- Mengambil RSS [{feed_info['media']}] Kategori '{feed_info['kategori']}' ...", end=" ")
+        berita = ambil_rss(feed_info)
         print(f"{len(berita)} berita")
         semua_berita.extend(berita)
         time.sleep(0.5)
 
-    print("\n- Mengambil Kompas.com via scraping ...", end=" ")
+    print("\n- Mengambil Kompas via scraping ...", end=" ")
     kompas_berita = ambil_kompas(max_artikel=30)
     print(f"{len(kompas_berita)} berita")
     semua_berita.extend(kompas_berita)
@@ -187,17 +224,17 @@ def main():
     df = pd.DataFrame(semua_berita)
     df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(parse_tanggal)
 
-    # Perbaikan timezone
-    now = datetime.now().astimezone()
+    now = datetime.now(timezone.utc)
     batas_lama = now - timedelta(days=MAKS_UMUR_HARI)
-    df["_tanggal_parsed"] = df["_tanggal_parsed"].apply(lambda d: d.replace(tzinfo=None) if d and d.tzinfo else d)
+    
     df = df[df["_tanggal_parsed"].notna()]
-    df = df[df["_tanggal_parsed"] >= batas_lama.replace(tzinfo=None)]
+    df = df[df["_tanggal_parsed"] >= batas_lama]
 
     if df.empty:
         print("Tidak ada berita dalam rentang tanggal yang ditentukan.")
         return
 
+    df["Tanggal Terbit"] = df["_tanggal_parsed"].apply(format_tanggal_rfc2822)
     df["_tanggal_file"] = df["_tanggal_parsed"].apply(lambda d: d.date().isoformat())
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
