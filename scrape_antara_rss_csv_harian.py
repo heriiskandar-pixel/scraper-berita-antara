@@ -62,17 +62,10 @@ import re
 # FUNGSI SCRAPING LANGSUNG UNTUK DETIK.COM
 # ----------------------------------------------------------------------
 def ambil_detik(max_artikel=30):
-    """Ambil berita dari Detik.com dengan berbagai fallback selector."""
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    headers = {"User-Agent": "Mozilla/5.0"}
     hasil = []
-    debug_count = 0
 
-    # Coba beberapa URL utama Detik
-    urls = [
-        "https://www.detik.com/",
-        "https://news.detik.com/",
-        "https://www.detik.com/terpopuler"
-    ]
+    urls = ["https://www.detik.com/", "https://news.detik.com/", "https://www.detik.com/terpopuler"]
 
     for url in urls:
         if len(hasil) >= max_artikel:
@@ -81,125 +74,56 @@ def ambil_detik(max_artikel=30):
             resp = requests.get(url, headers=headers, timeout=15)
             resp.raise_for_status()
         except Exception as e:
-            print(f"  Gagal ambil Detik dari {url}: {e}")
+            print(f"Gagal ambil Detik dari {url}: {e}")
             continue
 
         soup = BeautifulSoup(resp.text, 'lxml')
+        link_candidates = soup.find_all('a', href=re.compile(r'/\d+/'))
         
-        # Kumpulkan semua link yang mengarah ke artikel (pola URL)
-        link_candidates = soup.find_all('a', href=re.compile(r'/(berita|news|detik|read|video)/\d+'))
-        # Tambahkan juga yang mengandung 'detail' atau 'article'
-        link_candidates += soup.find_all('a', href=re.compile(r'/detail/|/article/'))
-
         for a in link_candidates[:max_artikel * 3]:
-            try:
-                link = a.get('href')
-                if not link:
-                    continue
-                if link.startswith('/'):
-                    link = 'https://www.detik.com' + link
-                elif not link.startswith('http'):
-                    continue
-
-                judul = a.get_text(strip=True)
-                if len(judul) < 20:
-                    continue
-
-                # Ekstrak kategori dari URL
-                kategori = 'umum'
-                path = link.replace('https://', '').replace('http://', '')
-                if path.startswith('news.'):
-                    path = path.replace('news.', '')
-                parts = path.split('/')
-                if len(parts) > 1:
-                    possible = parts[1].lower()
-                    if possible in ['ekonomi', 'politik', 'olahraga', 'sepakbola', 'tekno', 'health', 'lifestyle', 'dunia', 'metro', 'humaniora', 'hiburan', 'otomotif', 'bisnis', 'finansial', 'bursa']:
-                        kategori = possible
-
-                # --- Ambil TANGGAL dari berbagai sumber ---
-                tanggal = ''
-                # 1. Cari tag <time>
-                time_tag = a.find('time') or a.find_parent('time')
-                if time_tag:
-                    tanggal = time_tag.get_text(strip=True)
-                # 2. Cari elemen dengan class date/time
-                if not tanggal:
-                    for parent in [a, a.parent, a.parent.parent] if a.parent else []:
-                        for el in parent.find_all(['span', 'div'], class_=re.compile(r'time|date|published')):
-                            tanggal = el.get_text(strip=True)
-                            if tanggal:
-                                break
-                        if tanggal:
-                            break
-                # 3. Coba ambil dari atribut datetime
-                if not tanggal and time_tag and time_tag.get('datetime'):
-                    tanggal = time_tag['datetime']
-
-                # Jika masih kosong, coba ambil dari meta di halaman artikel (tapi kita belum buka halaman)
-                # Untuk efisiensi, kita skip dulu, nanti fallback ke sekarang
-
-                if debug_count < 3:
-                    print(f"  [DEBUG Detik] Contoh tanggal: '{tanggal}'")
-                    debug_count += 1
-
-                hasil.append({
-                    "Kategori": kategori,
-                    "Judul": judul,
-                    "Tanggal Terbit": tanggal,
-                    "Penulis": "",
-                    "Ringkasan": "",
-                    "Link": link,
-                    "URL Gambar": "",
-                    "Media": "detikcom"
-                })
-                if len(hasil) >= max_artikel:
-                    break
-            except Exception:
+            link = a.get('href')
+            if not link or not link.startswith("http"):
+                continue
+            judul = a.get_text(strip=True)
+            if len(judul) < 20:
                 continue
 
-    # Jika masih kurang, coba pendekatan alternatif: ambil dari headline utama
-    if len(hasil) < 10:
-        try:
-            resp = requests.get("https://www.detik.com/", headers=headers, timeout=10)
-            soup = BeautifulSoup(resp.text, 'lxml')
-            for h2 in soup.find_all(['h2', 'h3', 'h4']):
-                a = h2.find('a', href=True)
-                if not a:
-                    continue
-                link = a['href']
-                if link.startswith('/'):
-                    link = 'https://www.detik.com' + link
-                judul = a.get_text(strip=True)
-                if len(judul) > 20 and link not in [item['Link'] for item in hasil]:
-                    hasil.append({
-                        "Kategori": "umum",
-                        "Judul": judul,
-                        "Tanggal Terbit": "",
-                        "Penulis": "",
-                        "Ringkasan": "",
-                        "Link": link,
-                        "URL Gambar": "",
-                        "Media": "detikcom"
-                    })
-                    if len(hasil) >= max_artikel:
-                        break
-        except:
-            pass
+            tanggal = ""
+            try:
+                artikel_resp = requests.get(link, headers=headers, timeout=10)
+                artikel_soup = BeautifulSoup(artikel_resp.text, 'lxml')
+                meta_time = artikel_soup.find('meta', attrs={'property':'article:published_time'})
+                if meta_time and meta_time.get('content'):
+                    tanggal = meta_time['content']
+                else:
+                    date_div = artikel_soup.find(['div','span'], class_=re.compile(r'date|time'))
+                    if date_div:
+                        tanggal = date_div.get_text(strip=True)
+            except Exception as e:
+                print(f"Gagal ambil tanggal dari {link}: {e}")
 
+            hasil.append({
+                "Kategori": "umum",
+                "Judul": judul,
+                "Tanggal Terbit": tanggal,
+                "Penulis": "",
+                "Ringkasan": "",
+                "Link": link,
+                "URL Gambar": "",
+                "Media": "detikcom"
+            })
+            if len(hasil) >= max_artikel:
+                break
     return hasil
+
 # ----------------------------------------------------------------------
 # FUNGSI SCRAPING LANGSUNG UNTUK KOMPAS.COM
 # ----------------------------------------------------------------------
 def ambil_kompas(max_artikel=30):
-    """Ambil berita dari Kompas.com dengan berbagai fallback selector."""
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    headers = {"User-Agent": "Mozilla/5.0"}
     hasil = []
-    debug_count = 0
 
-    urls = [
-        "https://www.kompas.com/",
-        "https://www.kompas.com/terpopuler"
-    ]
+    urls = ["https://www.kompas.com/", "https://www.kompas.com/terpopuler"]
 
     for url in urls:
         if len(hasil) >= max_artikel:
@@ -208,76 +132,48 @@ def ambil_kompas(max_artikel=30):
             resp = requests.get(url, headers=headers, timeout=15)
             resp.raise_for_status()
         except Exception as e:
-            print(f"  Gagal ambil Kompas dari {url}: {e}")
+            print(f"Gagal ambil Kompas dari {url}: {e}")
             continue
 
         soup = BeautifulSoup(resp.text, 'lxml')
         link_candidates = soup.find_all('a', href=re.compile(r'/read/\d+'))
-        link_candidates += soup.find_all('a', href=re.compile(r'/article/|/news/'))
 
         for a in link_candidates[:max_artikel * 3]:
-            try:
-                link = a.get('href')
-                if not link:
-                    continue
-                if link.startswith('/'):
-                    link = 'https://www.kompas.com' + link
-                elif not link.startswith('http'):
-                    continue
-
-                judul = a.get_text(strip=True)
-                if len(judul) < 20:
-                    continue
-
-                # Kategori dari URL
-                kategori = 'umum'
-                path = link.replace('https://', '').replace('http://', '')
-                if path.startswith('www.'):
-                    path = path.replace('www.', '')
-                parts = path.split('/')
-                if len(parts) > 1:
-                    possible = parts[1].lower()
-                    if possible in ['ekonomi', 'politik', 'olahraga', 'sepakbola', 'tekno', 'health', 'lifestyle', 'dunia', 'metro', 'humaniora', 'hiburan', 'otomotif', 'bisnis', 'finansial', 'bursa', 'internasional', 'nasional']:
-                        kategori = possible
-
-                # --- Ambil TANGGAL ---
-                tanggal = ''
-                # 1. <time>
-                time_tag = a.find('time') or a.find_parent('time')
-                if time_tag:
-                    tanggal = time_tag.get_text(strip=True)
-                    if not tanggal and time_tag.get('datetime'):
-                        tanggal = time_tag['datetime']
-                # 2. Cari elemen dengan class date
-                if not tanggal:
-                    for parent in [a, a.parent, a.parent.parent] if a.parent else []:
-                        for el in parent.find_all(['span', 'div'], class_=re.compile(r'date|time|published')):
-                            tanggal = el.get_text(strip=True)
-                            if tanggal:
-                                break
-                        if tanggal:
-                            break
-
-                if debug_count < 3:
-                    print(f"  [DEBUG Kompas] Contoh tanggal: '{tanggal}'")
-                    debug_count += 1
-
-                hasil.append({
-                    "Kategori": kategori,
-                    "Judul": judul,
-                    "Tanggal Terbit": tanggal,
-                    "Penulis": "",
-                    "Ringkasan": "",
-                    "Link": link,
-                    "URL Gambar": "",
-                    "Media": "kompascom"
-                })
-                if len(hasil) >= max_artikel:
-                    break
-            except Exception:
+            link = a.get('href')
+            if not link or not link.startswith("http"):
+                continue
+            judul = a.get_text(strip=True)
+            if len(judul) < 20:
                 continue
 
+            tanggal = ""
+            try:
+                artikel_resp = requests.get(link, headers=headers, timeout=10)
+                artikel_soup = BeautifulSoup(artikel_resp.text, 'lxml')
+                meta_time = artikel_soup.find('meta', attrs={'name':'publishdate'})
+                if meta_time and meta_time.get('content'):
+                    tanggal = meta_time['content']
+                else:
+                    date_div = artikel_soup.find(['div','span'], class_=re.compile(r'date|time|read__time'))
+                    if date_div:
+                        tanggal = date_div.get_text(strip=True)
+            except Exception as e:
+                print(f"Gagal ambil tanggal dari {link}: {e}")
+
+            hasil.append({
+                "Kategori": "umum",
+                "Judul": judul,
+                "Tanggal Terbit": tanggal,
+                "Penulis": "",
+                "Ringkasan": "",
+                "Link": link,
+                "URL Gambar": "",
+                "Media": "kompascom"
+            })
+            if len(hasil) >= max_artikel:
+                break
     return hasil
+
 # ----------------------------------------------------------------------
 # 1) DAFTAR KANAL RSS ANTARA NEWS
 #    (kalau mau ambil sebagian saja, edit/hapus baris di bawah)
