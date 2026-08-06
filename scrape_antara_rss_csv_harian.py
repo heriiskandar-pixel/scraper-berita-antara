@@ -57,11 +57,35 @@ except ImportError:
     _CF_SCRAPER = requests
 
 def _http_get(url, timeout=15, gunakan_cloudscraper=False):
-    """Wrapper GET request. gunakan_cloudscraper=True untuk situs berproteksi
-    Cloudflare seperti CNN Indonesia; selain itu pakai requests biasa."""
-    if gunakan_cloudscraper:
-        return _CF_SCRAPER.get(url, headers=HEADERS, timeout=timeout)
-    return requests.get(url, headers=HEADERS, timeout=timeout)
+    """Wrapper GET request.
+    gunakan_cloudscraper=True untuk situs berproteksi Cloudflare seperti CNN
+    Indonesia: coba cloudscraper dulu (menirukan tantangan Cloudflare seperti
+    browser), lalu kalau TETAP 403 (biasanya karena IP asal request - misalnya
+    runner GitHub Actions - sudah masuk daftar reputasi buruk Cloudflare,
+    bukan soal fingerprint lagi), fallback ke proxy publik allorigins.win
+    yang IP keluarnya berbeda dari IP asal kita."""
+    if not gunakan_cloudscraper:
+        return requests.get(url, headers=HEADERS, timeout=timeout)
+
+    resp = None
+    try:
+        resp = _CF_SCRAPER.get(url, headers=HEADERS, timeout=timeout)
+        if resp.status_code != 403:
+            return resp
+    except Exception:
+        pass
+
+    # Fallback: lewat proxy publik. Ini bukan solusi permanen yang 100% andal
+    # (proxy gratis bisa lambat/limit), tapi cukup untuk menembus blokir
+    # berbasis reputasi IP dari runner CI/CD.
+    try:
+        proxy_url = "https://api.allorigins.win/raw?url=" + requests.utils.quote(url, safe="")
+        resp_proxy = requests.get(proxy_url, headers=HEADERS, timeout=timeout + 15)
+        return resp_proxy
+    except Exception:
+        if resp is not None:
+            return resp
+        raise
 
 # ----------------------------------------------------------------------
 # INISIALISASI MODEL AI SENTIMEN (INDOBERT)
