@@ -6,7 +6,7 @@ Skrip otomatisasi penarik berita:
 - Analisis Sentimen berbasis AI (IndoBERT via Hugging Face Transformers).
 - Menarik seluruh RSS Feed ANTARA News (17 Kanal) & RSS Detikcom.
 - Scraping halaman Indeks Kanal Detikcom hingga Halaman 3.
-- Scraping halaman Indeks Kompas.com hingga Halaman 3.
+- Scraping halaman Indeks Kompas.com hingga Halaman 3 (Diperbarui untuk mengambil seluruh berita secara presisi).
 - Ekstraksi nama Penulis/Author secara presisi.
 - Menyimpan data kumulatif tanpa duplikat ke Excel per tanggal terbit & index.json.
 """
@@ -340,7 +340,7 @@ def ambil_indeks_detik(subdomain, kategori_nama, max_page=3):
     return hasil
 
 def ambil_indeks_kompas(max_page=3):
-    """Scraping Indeks Kompas.com + Penulis & Sentimen IndoBERT"""
+    """Scraping Indeks Kompas.com secara fleksibel & presisi + Penulis & Sentimen IndoBERT"""
     hasil = []
     seen_links = set()
     tgl_now = datetime.now().strftime("%Y-%m-%d")
@@ -353,18 +353,24 @@ def ambil_indeks_kompas(max_page=3):
                 break
                 
             soup = BeautifulSoup(resp.text, 'lxml')
-            articles = soup.find_all('div', class_='article__list') or soup.find_all('div', class_='articleList')
             
+            # Perluas pencarian kontainer artikel Kompas agar mampu menangkap berbagai variasi class layout
+            articles = (
+                soup.find_all('div', class_=re.compile(r'article__list|articleList|article__item')) or
+                soup.find_all('div', class_='neath-item')
+            )
+            
+            # Jika kontainer spesifik kosong, langsung ekstrak semua tag 'a' yang menuju ke halaman berita kompas
             if not articles:
-                link_candidates = soup.find_all('a', href=re.compile(r'/read/\d{4}/\d{2}/\d{2}/'))
+                link_candidates = soup.find_all('a', href=re.compile(r'https?://[a-zA-Z0-9.-]*kompas\.com/read/\d{4}/\d{2}/\d{2}/\d+'))
                 for a in link_candidates:
                     link = a.get('href')
-                    if not link or link in seen_links: continue
-                    if link.startswith("//"): link = "https:" + link
-                    elif link.startswith("/"): link = "https://www.kompas.com" + link
+                    if not link or link in seen_links: 
+                        continue
                     
                     judul = a.get_text(strip=True)
-                    if len(judul) < 20: continue
+                    if len(judul) < 10: 
+                        continue
                     
                     seen_links.add(link)
                     ringkasan, url_gambar, penulis = ekstraksi_detail_halaman(link, media_default="Kompas.com")
@@ -385,17 +391,26 @@ def ambil_indeks_kompas(max_page=3):
             else:
                 for art in articles:
                     tag_a = art.find('a', href=True)
-                    if not tag_a: continue
+                    if not tag_a: 
+                        continue
                     
                     link = tag_a['href']
-                    if link in seen_links: continue
+                    if not link.startswith("http"):
+                        if link.startswith("//"): 
+                            link = "https:" + link
+                        elif link.startswith("/"): 
+                            link = "https://www.kompas.com" + link
+                        
+                    if link in seen_links: 
+                        continue
                     seen_links.add(link)
 
-                    tag_title = art.find('h3') or art.find('h2') or tag_a
+                    tag_title = art.find('h3') or art.find('h2') or art.find('a')
                     judul = tag_title.get_text(strip=True) if tag_title else ""
-                    if len(judul) < 15: continue
+                    if len(judul) < 10: 
+                        continue
 
-                    tag_cat = art.find('div', class_='article__subtitle') or art.find('h4')
+                    tag_cat = art.find('div', class_=re.compile(r'article__subtitle|subtitle|kanal')) or art.find('h4')
                     kategori = tag_cat.get_text(strip=True) if tag_cat else "General"
 
                     ringkasan, url_gambar, penulis = ekstraksi_detail_halaman(link, media_default="Kompas.com")
