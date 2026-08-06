@@ -4,7 +4,7 @@ scrape_berita_rss.py
 ====================
 Skrip otomatisasi penarik berita:
 - Analisis Sentimen berbasis AI (IndoBERT via Hugging Face Transformers).
-- Menarik RSS Feed ANTARA News, Detikcom, & CNN Indonesia (semua kanal).
+- Menarik RSS Feed ANTARA News, Detikcom, CNN Indonesia, Tribunnews, CNBC Indonesia, Bisnis Indonesia, Tempo, & Republika (semua kanal).
 - Scraping halaman Indeks Kanal Detikcom & Kompas.com hingga Halaman 3.
 - Pemetaan kategori, ekstraksi gambar, penulis, dan sentimen secara akurat.
 - Menyimpan data kumulatif tanpa duplikat ke Excel per tanggal terbit & index.json.
@@ -37,14 +37,11 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Referer": "https://www.cnnindonesia.com/",
+    "Referer": "https://www.google.com/",
 }
 
-# CNN Indonesia memakai proteksi Cloudflare yang mem-block request "requests"
-# polos dengan 403 Forbidden (fingerprint TLS/header-nya dikenali sebagai bot),
-# meski headernya sudah dibuat menyerupai browser. Solusinya pakai cloudscraper,
-# yang menirukan tantangan Cloudflare seperti browser sungguhan.
-# Install dulu jika belum ada: pip install cloudscraper
+# Beberapa media (seperti CNN Indonesia, CNBC Indonesia, dll.) mungkin menggunakan
+# proteksi Cloudflare atau proteksi bot lainnya. Skrip menggunakan cloudscraper jika tersedia.
 try:
     import cloudscraper
     _CF_SCRAPER = cloudscraper.create_scraper(
@@ -52,20 +49,12 @@ try:
     )
 except ImportError:
     print("Peringatan: package 'cloudscraper' belum terpasang. "
-          "Jalankan 'pip install cloudscraper' agar RSS CNN Indonesia "
-          "(yang diproteksi Cloudflare) bisa ditarik. Untuk sementara, "
-          "request ke CNN Indonesia akan pakai 'requests' biasa dan "
-          "kemungkinan besar tetap kena 403.")
+          "Jalankan 'pip install cloudscraper' agar RSS yang diproteksi Cloudflare "
+          "bisa ditarik dengan lancar.")
     _CF_SCRAPER = requests
 
 def _http_get(url, timeout=15, gunakan_cloudscraper=False):
-    """Wrapper GET request.
-    gunakan_cloudscraper=True untuk situs berproteksi Cloudflare seperti CNN
-    Indonesia: coba cloudscraper dulu (menirukan tantangan Cloudflare seperti
-    browser), lalu kalau TETAP 403 (biasanya karena IP asal request - misalnya
-    runner GitHub Actions - sudah masuk daftar reputasi buruk Cloudflare,
-    bukan soal fingerprint lagi), fallback ke proxy publik allorigins.win
-    yang IP keluarnya berbeda dari IP asal kita."""
+    """Wrapper GET request dengan dukungan cloudscraper dan fallback proxy publik."""
     if not gunakan_cloudscraper:
         return requests.get(url, headers=HEADERS, timeout=timeout)
 
@@ -77,9 +66,6 @@ def _http_get(url, timeout=15, gunakan_cloudscraper=False):
     except Exception:
         pass
 
-    # Fallback: lewat proxy publik. Ini bukan solusi permanen yang 100% andal
-    # (proxy gratis bisa lambat/limit), tapi cukup untuk menembus blokir
-    # berbasis reputasi IP dari runner CI/CD.
     try:
         proxy_url = "https://api.allorigins.win/raw?url=" + requests.utils.quote(url, safe="")
         resp_proxy = requests.get(proxy_url, headers=HEADERS, timeout=timeout + 15)
@@ -132,6 +118,7 @@ def analisa_sentimen(judul, ringkasan):
 # DAFTAR RSS FEEDS & KANAL INDEKS
 # ----------------------------------------------------------------------
 FEEDS_RSS = {
+    # ---- ANTARA News ----
     "antara-terkini":    {"url": "https://www.antaranews.com/rss/terkini.xml", "media": "Antara", "kategori": "Terkini"},
     "antara-top-news":   {"url": "https://www.antaranews.com/rss/top-news.xml", "media": "Antara", "kategori": "Top News"},
     "antara-politik":    {"url": "https://www.antaranews.com/rss/politik.xml", "media": "Antara", "kategori": "Politik"},
@@ -150,11 +137,12 @@ FEEDS_RSS = {
     "antara-warta-bumi": {"url": "https://www.antaranews.com/rss/warta-bumi.xml", "media": "Antara", "kategori": "Warta Bumi"},
     "antara-foto":       {"url": "https://www.antaranews.com/rss/foto.xml", "media": "Antara", "kategori": "Foto"},
 
+    # ---- Detikcom ----
     "detik-news":        {"url": "https://news.detik.com/rss", "media": "Detik", "kategori": "News"},
     "detik-finance":     {"url": "https://finance.detik.com/rss", "media": "Detik", "kategori": "Finance"},
     "detik-sport":       {"url": "https://sport.detik.com/rss", "media": "Detik", "kategori": "Sport"},
 
-    # ---- CNN Indonesia: seluruh RSS per-kanal (kategori mengikuti topik/kanal) ----
+    # ---- CNN Indonesia ----
     "cnn-nasional":      {"url": "https://www.cnnindonesia.com/nasional/rss", "media": "CNN Indonesia", "kategori": "Nasional"},
     "cnn-internasional": {"url": "https://www.cnnindonesia.com/internasional/rss", "media": "CNN Indonesia", "kategori": "Internasional"},
     "cnn-ekonomi":       {"url": "https://www.cnnindonesia.com/ekonomi/rss", "media": "CNN Indonesia", "kategori": "Ekonomi"},
@@ -164,6 +152,40 @@ FEEDS_RSS = {
     "cnn-gaya-hidup":    {"url": "https://www.cnnindonesia.com/gaya-hidup/rss", "media": "CNN Indonesia", "kategori": "Gaya Hidup"},
     "cnn-otomotif":      {"url": "https://www.cnnindonesia.com/otomotif/rss", "media": "CNN Indonesia", "kategori": "Otomotif"},
     "cnn-edukasi":       {"url": "https://www.cnnindonesia.com/edukasi/rss", "media": "CNN Indonesia", "kategori": "Edukasi"},
+
+    # ---- Tribunnews ----
+    "tribun-news":       {"url": "https://www.tribunnews.com/rss", "media": "Tribunnews", "kategori": "News"},
+    "tribun-bisnis":     {"url": "https://www.tribunnews.com/bisnis/rss", "media": "Tribunnews", "kategori": "Bisnis"},
+    "tribun-superskor":  {"url": "https://www.tribunnews.com/superskor/rss", "media": "Tribunnews", "kategori": "Olahraga"},
+    "tribun-seleb":      {"url": "https://www.tribunnews.com/seleb/rss", "media": "Tribunnews", "kategori": "Seleb"},
+    "tribun-lifestyle":  {"url": "https://www.tribunnews.com/lifestyle/rss", "media": "Tribunnews", "kategori": "Lifestyle"},
+    "tribun-travel":     {"url": "https://www.tribunnews.com/travel/rss", "media": "Tribunnews", "kategori": "Travel"},
+
+    # ---- CNBC Indonesia ----
+    "cnbc-investment":   {"url": "https://www.cnbcindonesia.com/investment/rss", "media": "CNBC Indonesia", "kategori": "Investment"},
+    "cnbc-news":         {"url": "www.cnbcindonesia.com/news/rss", "media": "CNBC Indonesia", "kategori": "News"},
+    "cnbc-market":       {"url": "https://www.cnbcindonesia.com/market/rss", "media": "CNBC Indonesia", "kategori": "Market"},
+    "cnbc-entrepreneur": {"url": "https://www.cnbcindonesia.com/entrepreneur/rss", "media": "CNBC Indonesia", "kategori": "Entrepreneur"},
+    "cnbc-tech":         {"url": "https://www.cnbcindonesia.com/tech/rss", "media": "CNBC Indonesia", "kategori": "Tech"},
+    "cnbc-lifestyle":    {"url": "https://www.cnbcindonesia.com/lifestyle/rss", "media": "CNBC Indonesia", "kategori": "Lifestyle"},
+
+    # ---- Bisnis Indonesia ----
+    "bisnis-makro":      {"url": "https://entrepreneur.bisnis.com/rss", "media": "Bisnis Indonesia", "kategori": "Makro"}, # or general rss index if available
+    "bisnis-finansial":  {"url": "https://finansial.bisnis.com/rss", "media": "Bisnis Indonesia", "kategori": "Finansial"},
+    "bisnis-ekonomi":    {"url": "https://ekonomi.bisnis.com/rss", "media": "Bisnis Indonesia", "kategori": "Ekonomi"},
+    "bisnis-market":     {"url": "https://market.bisnis.com/rss", "media": "Bisnis Indonesia", "kategori": "Market"},
+
+    # ---- Tempo ----
+    "tempo-nasional":    {"url": "https://rss.tempo.co/nasional", "media": "Tempo", "kategori": "Nasional"},
+    "tempo-bisnis":      {"url": "https://rss.tempo.co/bisnis", "media": "Tempo", "kategori": "Bisnis"},
+    "tempo-metro":       {"url": "https://rss.tempo.co/metro", "media": "Tempo", "kategori": "Metro"},
+    "tempo-dunia":       {"url": "https://rss.tempo.co/dunia", "media": "Tempo", "kategori": "Dunia"},
+    "tempo-tekno":       {"url": "https://rss.tempo.co/tekno", "media": "Tempo", "kategori": "Tekno"},
+
+    # ---- Republika ----
+    "republika-news":    {"url": "https://republika.co.id/rss/", "media": "Republika", "kategori": "News"},
+    "republika-trend":   {"url": "https://republika.co.id/rss/trend", "media": "Republika", "kategori": "Trend"},
+    "republika-leisure": {"url": "https://republika.co.id/rss/leisure", "media": "Republika", "kategori": "Leisure"},
 }
 
 KANAL_INDEKS_DETIK = [
@@ -210,9 +232,9 @@ def ekstraksi_detail_halaman(url, media_default=""):
     ringkasan = ""
     url_gambar = ""
     penulis = ""
-    gunakan_cf = "cnnindonesia.com" in url
+    domain_cf = any(d in url for d in ["cnnindonesia.com", "cnbcindonesia.com", "tempo.co"])
     try:
-        resp = _http_get(url, timeout=6, gunakan_cloudscraper=gunakan_cf)
+        resp = _http_get(url, timeout=6, gunakan_cloudscraper=domain_cf)
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.text, 'lxml')
             
@@ -240,13 +262,13 @@ def ekstraksi_detail_halaman(url, media_default=""):
                 penulis = meta_auth['content'].strip()
             
             if not penulis:
-                elem_author = soup.select_one('.detail__author, .read__author, .credit-title-name, .author, .byline, .penulis, .detail-author')
+                elem_author = soup.select_one('.detail__author, .read__author, .credit-title-name, .author, .byline, .penulis, .detail-author, .writer')
                 if elem_author:
                     penulis = elem_author.get_text(strip=True)
 
             if penulis:
-                penulis = re.sub(r'^(Oleh|By|Penulis|Reporter)\s*:\s*', '', penulis, flags=re.I)
-                penulis = re.sub(r'\s*-\s*(detik|Kompas|ANTARA|CNN).*$', '', penulis, flags=re.I)
+                penulis = re.sub(r'^(Oleh|By|Penulis|Reporter|Editor)\s*:\s*', '', penulis, flags=re.I)
+                penulis = re.sub(r'\s*-\s*(detik|Kompas|ANTARA|CNN|CNBC|Tribun|Tempo|Bisnis|Republika).*$', '', penulis, flags=re.I)
                 penulis = penulis.strip()
 
     except Exception:
@@ -258,10 +280,7 @@ def ekstraksi_detail_halaman(url, media_default=""):
     return ringkasan, url_gambar, penulis
 
 def ekstraksi_detail_banyak_halaman(daftar_link, media_default="", max_workers=MAX_WORKERS):
-    """Mengambil ringkasan/gambar/penulis untuk BANYAK link sekaligus secara
-    paralel (bukan satu-satu berurutan). Jauh lebih cepat karena bottleneck-nya
-    adalah waktu tunggu jaringan (I/O), bukan pemrosesan CPU.
-    Return: dict {link: (ringkasan, url_gambar, penulis)}"""
+    """Mengambil ringkasan/gambar/penulis untuk BANYAK link sekaligus secara paralel."""
     hasil = {}
     if not daftar_link:
         return hasil
@@ -282,11 +301,11 @@ def ekstraksi_detail_banyak_halaman(daftar_link, media_default="", max_workers=M
 # MODUL SCRAPING
 # ----------------------------------------------------------------------
 def ambil_rss(feed_info):
-    """Ekstraksi berita dari Feed RSS (Antara, Detik, CNN Indonesia)"""
+    """Ekstraksi berita dari Feed RSS berbagai media"""
     hasil = []
-    gunakan_cf = feed_info["media"] == "CNN Indonesia"
+    domain_cf = any(d in feed_info["url"] for d in ["cnnindonesia.com", "cnbcindonesia.com", "tempo.co"])
     try:
-        resp = _http_get(feed_info["url"], timeout=20, gunakan_cloudscraper=gunakan_cf)
+        resp = _http_get(feed_info["url"], timeout=20, gunakan_cloudscraper=domain_cf)
         resp.raise_for_status()
         
         try:
@@ -300,7 +319,6 @@ def ambil_rss(feed_info):
             'content': 'http://purl.org/rss/1.0/modules/content/'
         }
 
-        # --- Tahap 1: parsing cepat semua item dari XML (tanpa request tambahan) ---
         item_mentah = []
         link_perlu_detail = set()
         for item in root.findall(".//item"):
@@ -348,12 +366,10 @@ def ambil_rss(feed_info):
                 "url_gambar": url_gambar,
             })
 
-        # --- Tahap 2: ambil halaman detail yang kurang lengkap, sekaligus & paralel ---
         detail_map = ekstraksi_detail_banyak_halaman(
             list(link_perlu_detail), media_default=feed_info["media"]
         )
 
-        # --- Tahap 3: gabungkan hasil detail + hitung sentimen ---
         for it in item_mentah:
             penulis = it["penulis"]
             deskripsi = it["deskripsi"]
@@ -392,7 +408,7 @@ def ambil_indeks_detik(subdomain, kategori_nama, max_page=3):
     """Scraping Indeks Kanal Detikcom"""
     hasil = []
     tgl_now = datetime.now().strftime("%m/%d/%Y")
-    kandidat = []  # [(link, judul, url_gambar_awal), ...]
+    kandidat = []
 
     for page in range(1, max_page + 1):
         url = f"https://{subdomain}.detik.com/indeks/{page}?date={tgl_now}"
@@ -423,7 +439,6 @@ def ambil_indeks_detik(subdomain, kategori_nama, max_page=3):
         except Exception as e:
             print(f"Gagal scraping indeks Detik [{subdomain}] hal {page}: {e}")
 
-    # Ambil ringkasan/gambar/penulis untuk semua kandidat sekaligus & paralel
     detail_map = ekstraksi_detail_banyak_halaman(
         [link for link, _, _ in kandidat], media_default="Detikcom"
     )
@@ -456,7 +471,7 @@ def ambil_indeks_kompas(max_page=3):
     hasil = []
     seen_links = set()
     tgl_now = datetime.now().strftime("%Y-%m-%d")
-    kandidat = []  # [(link, judul, kategori), ...]
+    kandidat = []
 
     for page in range(1, max_page + 1):
         url = f"https://indeks.kompas.com/?site=all&date={tgl_now}&page={page}"
@@ -466,7 +481,6 @@ def ambil_indeks_kompas(max_page=3):
                 break
                 
             soup = BeautifulSoup(resp.text, 'lxml')
-            
             articles = (
                 soup.find_all('div', class_=re.compile(r'article__list|articleList|article__item')) or
                 soup.find_all('div', class_='neath-item')
@@ -478,11 +492,9 @@ def ambil_indeks_kompas(max_page=3):
                     link = a.get('href')
                     if not link or link in seen_links: 
                         continue
-                    
                     judul = a.get_text(strip=True)
                     if len(judul) < 10: 
                         continue
-                    
                     seen_links.add(link)
                     kandidat.append((link, judul, "Berita Utama"))
             else:
@@ -490,14 +502,12 @@ def ambil_indeks_kompas(max_page=3):
                     tag_a = art.find('a', href=True)
                     if not tag_a: 
                         continue
-                    
                     link = tag_a['href']
                     if not link.startswith("http"):
                         if link.startswith("//"): 
                             link = "https:" + link
                         elif link.startswith("/"): 
                             link = "https://www.kompas.com" + link
-                        
                     if link in seen_links: 
                         continue
                     seen_links.add(link)
@@ -514,7 +524,6 @@ def ambil_indeks_kompas(max_page=3):
         except Exception as e:
             print(f"Gagal scraping indeks Kompas hal {page}: {e}")
 
-    # Ambil ringkasan/gambar/penulis untuk semua kandidat sekaligus & paralel
     detail_map = ekstraksi_detail_banyak_halaman(
         [link for link, _, _ in kandidat], media_default="Kompas.com"
     )
@@ -573,11 +582,11 @@ def simpan_excel(df, path_output):
 # MAIN FUNCTION
 # ----------------------------------------------------------------------
 def main():
-    print("=== MULAI SCRAPING BERITA AUTOMATIS + AI SENTIMEN (INDOBERT) ===\n")
+    print("=== MULAI SCRAPING BERITA OTOMATIS + AI SENTIMEN (INDOBERT) ===\n")
     semua_berita = []
 
-    # 1. Ambil RSS Feeds (Antara, Detik & CNN Indonesia - semua kanal)
-    print("1. Mengambil Feed RSS (ANTARA, Detik & CNN Indonesia)...")
+    # 1. Ambil Feed RSS (Semua Media)
+    print("1. Mengambil Feed RSS (Antara, Detik, CNN, Tribun, CNBC, Bisnis, Tempo, Republika)...")
     for key, feed_info in FEEDS_RSS.items():
         print(f"   - [{feed_info['media']}] Kanal '{feed_info['kategori']}'...", end=" ")
         berita = ambil_rss(feed_info)
@@ -599,13 +608,6 @@ def main():
     kompas_berita = ambil_indeks_kompas(max_page=MAX_PAGE_INDEKS)
     print(f"{len(kompas_berita)} berita")
     semua_berita.extend(kompas_berita)
-
-    # Catatan: scraping indeks HTML CNN Indonesia sudah dihapus karena struktur
-    # halaman indeksnya sudah berubah dan tidak lagi cocok dengan selector lama
-    # (soup.find_all('article') selalu kosong). Sebagai gantinya, semua berita
-    # CNN Indonesia kini diambil lewat RSS per-kanal pada langkah 1 di atas,
-    # yang jauh lebih stabil dan sudah mencakup kategori Nasional, Internasional,
-    # Ekonomi, Olahraga, Teknologi, Hiburan, Gaya Hidup, Otomotif, dan Edukasi.
 
     if not semua_berita:
         print("\nTidak ada berita yang berhasil diambil.")
