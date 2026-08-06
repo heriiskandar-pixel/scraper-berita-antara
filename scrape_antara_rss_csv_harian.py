@@ -4,8 +4,8 @@ scrape_berita_rss.py
 ====================
 Skrip otomatisasi penarik berita:
 - Analisis Sentimen berbasis AI (IndoBERT via Hugging Face Transformers).
-- Menarik RSS Feed ANTARA News & Detikcom.
-- Scraping halaman Indeks Kanal Detikcom, Kompas.com, & CNN Indonesia hingga Halaman 3.
+- Menarik RSS Feed ANTARA News, Detikcom, & CNN Indonesia (semua kanal).
+- Scraping halaman Indeks Kanal Detikcom & Kompas.com hingga Halaman 3.
 - Pemetaan kategori, ekstraksi gambar, penulis, dan sentimen secara akurat.
 - Menyimpan data kumulatif tanpa duplikat ke Excel per tanggal terbit & index.json.
 """
@@ -99,6 +99,17 @@ FEEDS_RSS = {
     "detik-news":        {"url": "https://news.detik.com/rss", "media": "Detik", "kategori": "News"},
     "detik-finance":     {"url": "https://finance.detik.com/rss", "media": "Detik", "kategori": "Finance"},
     "detik-sport":       {"url": "https://sport.detik.com/rss", "media": "Detik", "kategori": "Sport"},
+
+    # ---- CNN Indonesia: seluruh RSS per-kanal (kategori mengikuti topik/kanal) ----
+    "cnn-nasional":      {"url": "https://www.cnnindonesia.com/nasional/rss", "media": "CNN Indonesia", "kategori": "Nasional"},
+    "cnn-internasional": {"url": "https://www.cnnindonesia.com/internasional/rss", "media": "CNN Indonesia", "kategori": "Internasional"},
+    "cnn-ekonomi":       {"url": "https://www.cnnindonesia.com/ekonomi/rss", "media": "CNN Indonesia", "kategori": "Ekonomi"},
+    "cnn-olahraga":      {"url": "https://www.cnnindonesia.com/olahraga/rss", "media": "CNN Indonesia", "kategori": "Olahraga"},
+    "cnn-teknologi":     {"url": "https://www.cnnindonesia.com/teknologi/rss", "media": "CNN Indonesia", "kategori": "Teknologi"},
+    "cnn-hiburan":       {"url": "https://www.cnnindonesia.com/hiburan/rss", "media": "CNN Indonesia", "kategori": "Hiburan"},
+    "cnn-gaya-hidup":    {"url": "https://www.cnnindonesia.com/gaya-hidup/rss", "media": "CNN Indonesia", "kategori": "Gaya Hidup"},
+    "cnn-otomotif":      {"url": "https://www.cnnindonesia.com/otomotif/rss", "media": "CNN Indonesia", "kategori": "Otomotif"},
+    "cnn-edukasi":       {"url": "https://www.cnnindonesia.com/edukasi/rss", "media": "CNN Indonesia", "kategori": "Edukasi"},
 }
 
 KANAL_INDEKS_DETIK = [
@@ -195,7 +206,7 @@ def ekstraksi_detail_halaman(url, media_default=""):
 # MODUL SCRAPING
 # ----------------------------------------------------------------------
 def ambil_rss(feed_info):
-    """Ekstraksi berita dari Feed RSS (Antara, Detik)"""
+    """Ekstraksi berita dari Feed RSS (Antara, Detik, CNN Indonesia)"""
     hasil = []
     try:
         resp = requests.get(feed_info["url"], headers=HEADERS, timeout=20)
@@ -417,67 +428,6 @@ def ambil_indeks_kompas(max_page=3):
 
     return hasil
 
-def ambil_indeks_cnn(max_page=3):
-    """Scraping Indeks CNN Indonesia secara langsung"""
-    hasil = []
-    seen_links = set()
-    
-    for page in range(1, max_page + 1):
-        url = f"https://www.cnnindonesia.com/nasional/indeks/{page}"
-        try:
-            resp = requests.get(url, headers=HEADERS, timeout=15)
-            if resp.status_code != 200:
-                break
-                
-            soup = BeautifulSoup(resp.text, 'lxml')
-            articles = soup.find_all('article')
-            
-            for art in articles:
-                tag_a = art.find('a', href=True)
-                if not tag_a: 
-                    continue
-                
-                link = tag_a['href']
-                if link in seen_links: 
-                    continue
-                seen_links.add(link)
-
-                tag_title = art.find('h2') or art.find('h3') or tag_a
-                judul = tag_title.get_text(strip=True) if tag_title else ""
-                if len(judul) < 10: 
-                    continue
-
-                tag_img = art.find('img')
-                url_gambar = ""
-                if tag_img:
-                    url_gambar = tag_img.get('src') or tag_img.get('data-src') or ""
-
-                tag_cat = art.find('span', class_=re.compile(r'kanal|category'))
-                kategori = tag_cat.get_text(strip=True) if tag_cat else "Nasional"
-
-                ringkasan, img_detail, penulis = ekstraksi_detail_halaman(link, media_default="CNN Indonesia")
-                if not url_gambar:
-                    url_gambar = img_detail
-
-                sentimen = analisa_sentimen(judul, ringkasan)
-
-                hasil.append({
-                    "Kategori": kategori,
-                    "Judul": judul,
-                    "Tanggal Terbit": format_tanggal_rfc2822(datetime.now(timezone(timedelta(hours=7)))),
-                    "Penulis": penulis,
-                    "Ringkasan": ringkasan,
-                    "Sentimen": sentimen,
-                    "Link": link,
-                    "URL Gambar": url_gambar,
-                    "Media": "CNN Indonesia"
-                })
-                time.sleep(0.05)
-        except Exception as e:
-            print(f"Gagal scraping indeks CNN hal {page}: {e}")
-
-    return hasil
-
 # ----------------------------------------------------------------------
 # PENYIMPANAN DATA KE EXCEL
 # ----------------------------------------------------------------------
@@ -514,8 +464,8 @@ def main():
     print("=== MULAI SCRAPING BERITA AUTOMATIS + AI SENTIMEN (INDOBERT) ===\n")
     semua_berita = []
 
-    # 1. Ambil RSS Feeds (Antara & Detik)
-    print("1. Mengambil Feed RSS (ANTARA & Detik)...")
+    # 1. Ambil RSS Feeds (Antara, Detik & CNN Indonesia - semua kanal)
+    print("1. Mengambil Feed RSS (ANTARA, Detik & CNN Indonesia)...")
     for key, feed_info in FEEDS_RSS.items():
         print(f"   - [{feed_info['media']}] Kanal '{feed_info['kategori']}'...", end=" ")
         berita = ambil_rss(feed_info)
@@ -538,11 +488,12 @@ def main():
     print(f"{len(kompas_berita)} berita")
     semua_berita.extend(kompas_berita)
 
-    # 4. Scraping Indeks CNN Indonesia
-    print(f"\n4. Mengambil Indeks CNN Indonesia (Halaman 1-{MAX_PAGE_INDEKS})...", end=" ")
-    cnn_berita = ambil_indeks_cnn(max_page=MAX_PAGE_INDEKS)
-    print(f"{len(cnn_berita)} berita")
-    semua_berita.extend(cnn_berita)
+    # Catatan: scraping indeks HTML CNN Indonesia sudah dihapus karena struktur
+    # halaman indeksnya sudah berubah dan tidak lagi cocok dengan selector lama
+    # (soup.find_all('article') selalu kosong). Sebagai gantinya, semua berita
+    # CNN Indonesia kini diambil lewat RSS per-kanal pada langkah 1 di atas,
+    # yang jauh lebih stabil dan sudah mencakup kategori Nasional, Internasional,
+    # Ekonomi, Olahraga, Teknologi, Hiburan, Gaya Hidup, Otomotif, dan Edukasi.
 
     if not semua_berita:
         print("\nTidak ada berita yang berhasil diambil.")
@@ -566,7 +517,7 @@ def main():
     df["_tanggal_file"] = df["_tanggal_parsed"].apply(lambda d: d.date().isoformat())
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-    print("\n5. Menyimpan & Menggabungkan Hasil ke File Excel...")
+    print("\n4. Menyimpan & Menggabungkan Hasil ke File Excel...")
     for tanggal_file, grup in df.groupby("_tanggal_file"):
         grup_clean = grup.drop(columns=["_tanggal_parsed", "_tanggal_file"])
         path_output = os.path.join(OUTPUT_FOLDER, f"{FILENAME_PREFIX}_{tanggal_file}.xlsx")
