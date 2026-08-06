@@ -16,6 +16,7 @@ import time
 import json
 import requests
 import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from html import unescape
 from xml.etree import ElementTree as ET
@@ -30,6 +31,7 @@ OUTPUT_FOLDER = "data"
 FILENAME_PREFIX = "berita"
 MAKS_UMUR_HARI = 7
 MAX_PAGE_INDEKS = 3
+MAX_WORKERS = 12  # jumlah request halaman detail yang dijalankan paralel
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -255,6 +257,27 @@ def ekstraksi_detail_halaman(url, media_default=""):
 
     return ringkasan, url_gambar, penulis
 
+def ekstraksi_detail_banyak_halaman(daftar_link, media_default="", max_workers=MAX_WORKERS):
+    """Mengambil ringkasan/gambar/penulis untuk BANYAK link sekaligus secara
+    paralel (bukan satu-satu berurutan). Jauh lebih cepat karena bottleneck-nya
+    adalah waktu tunggu jaringan (I/O), bukan pemrosesan CPU.
+    Return: dict {link: (ringkasan, url_gambar, penulis)}"""
+    hasil = {}
+    if not daftar_link:
+        return hasil
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_ke_link = {
+            executor.submit(ekstraksi_detail_halaman, link, media_default): link
+            for link in daftar_link
+        }
+        for future in as_completed(future_ke_link):
+            link = future_ke_link[future]
+            try:
+                hasil[link] = future.result()
+            except Exception:
+                hasil[link] = ("", "", "")
+    return hasil
+
 # ----------------------------------------------------------------------
 # MODUL SCRAPING
 # ----------------------------------------------------------------------
@@ -277,6 +300,9 @@ def ambil_rss(feed_info):
             'content': 'http://purl.org/rss/1.0/modules/content/'
         }
 
+        # --- Tahap 1: parsing cepat semua item dari XML (tanpa request tambahan) ---
+        item_mentah = []
+        link_perlu_detail = set()
         for item in root.findall(".//item"):
             judul = (item.findtext("title") or "").strip()
             link = (item.findtext("link") or "").strip()
@@ -308,8 +334,33 @@ def ambil_rss(feed_info):
                 if match_img:
                     url_gambar = match_img.group(1)
 
-            if not penulis or len(deskripsi) < 30 or not url_gambar:
-                detail_desc, detail_img, detail_penulis = ekstraksi_detail_halaman(link, media_default=feed_info["media"])
+            butuh_detail = (not penulis) or (len(deskripsi) < 30) or (not url_gambar)
+            if butuh_detail and link:
+                link_perlu_detail.add(link)
+
+            item_mentah.append({
+                "kategori": kategori_berita,
+                "judul": judul,
+                "link": link,
+                "tanggal": tanggal,
+                "penulis": penulis,
+                "deskripsi": deskripsi,
+                "url_gambar": url_gambar,
+            })
+
+        # --- Tahap 2: ambil halaman detail yang kurang lengkap, sekaligus & paralel ---
+        detail_map = ekstraksi_detail_banyak_halaman(
+            list(link_perlu_detail), media_default=feed_info["media"]
+        )
+
+        # --- Tahap 3: gabungkan hasil detail + hitung sentimen ---
+        for it in item_mentah:
+            penulis = it["penulis"]
+            deskripsi = it["deskripsi"]
+            url_gambar = it["url_gambar"]
+
+            if it["link"] in detail_map:
+                detail_desc, detail_img, detail_penulis = detail_map[it["link"]]
                 if not penulis and detail_penulis:
                     penulis = detail_penulis
                 if len(deskripsi) < 30 and detail_desc:
@@ -320,16 +371,16 @@ def ambil_rss(feed_info):
             if not penulis:
                 penulis = f"Redaksi {feed_info['media']}"
 
-            sentimen = analisa_sentimen(judul, deskripsi)
+            sentimen = analisa_sentimen(it["judul"], deskripsi)
 
             hasil.append({
-                "Kategori": kategori_berita,
-                "Judul": judul,
-                "Tanggal Terbit": tanggal,
+                "Kategori": it["kategori"],
+                "Judul": it["judul"],
+                "Tanggal Terbit": it["tanggal"],
                 "Penulis": penulis,
                 "Ringkasan": deskripsi,
                 "Sentimen": sentimen,
-                "Link": link,
+                "Link": it["link"],
                 "URL Gambar": url_gambar,
                 "Media": feed_info["media"]
             })
@@ -341,7 +392,8 @@ def ambil_indeks_detik(subdomain, kategori_nama, max_page=3):
     """Scraping Indeks Kanal Detikcom"""
     hasil = []
     tgl_now = datetime.now().strftime("%m/%d/%Y")
-    
+    kandidat = []  # [(link, judul, url_gambar_awal), ...]
+
     for page in range(1, max_page + 1):
         url = f"https://{subdomain}.detik.com/indeks/{page}?date={tgl_now}"
         try:
@@ -367,27 +419,36 @@ def ambil_indeks_detik(subdomain, kategori_nama, max_page=3):
                     url_gambar = tag_img.get('src') or tag_img.get('data-src') or ""
 
                 if len(judul) > 15:
-                    ringkasan, img_detail, penulis = ekstraksi_detail_halaman(link, media_default="Detikcom")
-                    if not url_gambar:
-                        url_gambar = img_detail
-
-                    sentimen = analisa_sentimen(judul, ringkasan)
-
-                    hasil.append({
-                        "Kategori": kategori_nama,
-                        "Judul": judul,
-                        "Tanggal Terbit": format_tanggal_rfc2822(datetime.now(timezone(timedelta(hours=7)))),
-                        "Penulis": penulis,
-                        "Ringkasan": ringkasan,
-                        "Sentimen": sentimen,
-                        "Link": link,
-                        "URL Gambar": url_gambar,
-                        "Media": "Detik"
-                    })
-                    time.sleep(0.05)
+                    kandidat.append((link, judul, url_gambar))
         except Exception as e:
             print(f"Gagal scraping indeks Detik [{subdomain}] hal {page}: {e}")
-            
+
+    # Ambil ringkasan/gambar/penulis untuk semua kandidat sekaligus & paralel
+    detail_map = ekstraksi_detail_banyak_halaman(
+        [link for link, _, _ in kandidat], media_default="Detikcom"
+    )
+
+    for link, judul, url_gambar in kandidat:
+        ringkasan, img_detail, penulis = detail_map.get(link, ("", "", ""))
+        if not url_gambar:
+            url_gambar = img_detail
+        if not penulis:
+            penulis = "Redaksi Detikcom"
+
+        sentimen = analisa_sentimen(judul, ringkasan)
+
+        hasil.append({
+            "Kategori": kategori_nama,
+            "Judul": judul,
+            "Tanggal Terbit": format_tanggal_rfc2822(datetime.now(timezone(timedelta(hours=7)))),
+            "Penulis": penulis,
+            "Ringkasan": ringkasan,
+            "Sentimen": sentimen,
+            "Link": link,
+            "URL Gambar": url_gambar,
+            "Media": "Detik"
+        })
+
     return hasil
 
 def ambil_indeks_kompas(max_page=3):
@@ -395,6 +456,7 @@ def ambil_indeks_kompas(max_page=3):
     hasil = []
     seen_links = set()
     tgl_now = datetime.now().strftime("%Y-%m-%d")
+    kandidat = []  # [(link, judul, kategori), ...]
 
     for page in range(1, max_page + 1):
         url = f"https://indeks.kompas.com/?site=all&date={tgl_now}&page={page}"
@@ -422,21 +484,7 @@ def ambil_indeks_kompas(max_page=3):
                         continue
                     
                     seen_links.add(link)
-                    ringkasan, url_gambar, penulis = ekstraksi_detail_halaman(link, media_default="Kompas.com")
-                    sentimen = analisa_sentimen(judul, ringkasan)
-                    
-                    hasil.append({
-                        "Kategori": "Berita Utama",
-                        "Judul": judul,
-                        "Tanggal Terbit": format_tanggal_rfc2822(datetime.now(timezone(timedelta(hours=7)))),
-                        "Penulis": penulis,
-                        "Ringkasan": ringkasan,
-                        "Sentimen": sentimen,
-                        "Link": link,
-                        "URL Gambar": url_gambar,
-                        "Media": "Kompas"
-                    })
-                    time.sleep(0.05)
+                    kandidat.append((link, judul, "Berita Utama"))
             else:
                 for art in articles:
                     tag_a = art.find('a', href=True)
@@ -462,23 +510,33 @@ def ambil_indeks_kompas(max_page=3):
                     tag_cat = art.find('div', class_=re.compile(r'article__subtitle|subtitle|kanal')) or art.find('h4')
                     kategori = tag_cat.get_text(strip=True) if tag_cat else "General"
 
-                    ringkasan, url_gambar, penulis = ekstraksi_detail_halaman(link, media_default="Kompas.com")
-                    sentimen = analisa_sentimen(judul, ringkasan)
-
-                    hasil.append({
-                        "Kategori": kategori,
-                        "Judul": judul,
-                        "Tanggal Terbit": format_tanggal_rfc2822(datetime.now(timezone(timedelta(hours=7)))),
-                        "Penulis": penulis,
-                        "Ringkasan": ringkasan,
-                        "Sentimen": sentimen,
-                        "Link": link,
-                        "URL Gambar": url_gambar,
-                        "Media": "Kompas"
-                    })
-                    time.sleep(0.05)
+                    kandidat.append((link, judul, kategori))
         except Exception as e:
             print(f"Gagal scraping indeks Kompas hal {page}: {e}")
+
+    # Ambil ringkasan/gambar/penulis untuk semua kandidat sekaligus & paralel
+    detail_map = ekstraksi_detail_banyak_halaman(
+        [link for link, _, _ in kandidat], media_default="Kompas.com"
+    )
+
+    for link, judul, kategori in kandidat:
+        ringkasan, url_gambar, penulis = detail_map.get(link, ("", "", ""))
+        if not penulis:
+            penulis = "Redaksi Kompas.com"
+
+        sentimen = analisa_sentimen(judul, ringkasan)
+
+        hasil.append({
+            "Kategori": kategori,
+            "Judul": judul,
+            "Tanggal Terbit": format_tanggal_rfc2822(datetime.now(timezone(timedelta(hours=7)))),
+            "Penulis": penulis,
+            "Ringkasan": ringkasan,
+            "Sentimen": sentimen,
+            "Link": link,
+            "URL Gambar": url_gambar,
+            "Media": "Kompas"
+        })
 
     return hasil
 
