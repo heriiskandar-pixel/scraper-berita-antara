@@ -32,8 +32,36 @@ MAKS_UMUR_HARI = 7
 MAX_PAGE_INDEKS = 3
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Referer": "https://www.cnnindonesia.com/",
 }
+
+# CNN Indonesia memakai proteksi Cloudflare yang mem-block request "requests"
+# polos dengan 403 Forbidden (fingerprint TLS/header-nya dikenali sebagai bot),
+# meski headernya sudah dibuat menyerupai browser. Solusinya pakai cloudscraper,
+# yang menirukan tantangan Cloudflare seperti browser sungguhan.
+# Install dulu jika belum ada: pip install cloudscraper
+try:
+    import cloudscraper
+    _CF_SCRAPER = cloudscraper.create_scraper(
+        browser={"browser": "chrome", "platform": "windows", "mobile": False}
+    )
+except ImportError:
+    print("Peringatan: package 'cloudscraper' belum terpasang. "
+          "Jalankan 'pip install cloudscraper' agar RSS CNN Indonesia "
+          "(yang diproteksi Cloudflare) bisa ditarik. Untuk sementara, "
+          "request ke CNN Indonesia akan pakai 'requests' biasa dan "
+          "kemungkinan besar tetap kena 403.")
+    _CF_SCRAPER = requests
+
+def _http_get(url, timeout=15, gunakan_cloudscraper=False):
+    """Wrapper GET request. gunakan_cloudscraper=True untuk situs berproteksi
+    Cloudflare seperti CNN Indonesia; selain itu pakai requests biasa."""
+    if gunakan_cloudscraper:
+        return _CF_SCRAPER.get(url, headers=HEADERS, timeout=timeout)
+    return requests.get(url, headers=HEADERS, timeout=timeout)
 
 # ----------------------------------------------------------------------
 # INISIALISASI MODEL AI SENTIMEN (INDOBERT)
@@ -156,8 +184,9 @@ def ekstraksi_detail_halaman(url, media_default=""):
     ringkasan = ""
     url_gambar = ""
     penulis = ""
+    gunakan_cf = "cnnindonesia.com" in url
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=6)
+        resp = _http_get(url, timeout=6, gunakan_cloudscraper=gunakan_cf)
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.text, 'lxml')
             
@@ -208,8 +237,9 @@ def ekstraksi_detail_halaman(url, media_default=""):
 def ambil_rss(feed_info):
     """Ekstraksi berita dari Feed RSS (Antara, Detik, CNN Indonesia)"""
     hasil = []
+    gunakan_cf = feed_info["media"] == "CNN Indonesia"
     try:
-        resp = requests.get(feed_info["url"], headers=HEADERS, timeout=20)
+        resp = _http_get(feed_info["url"], timeout=20, gunakan_cloudscraper=gunakan_cf)
         resp.raise_for_status()
         
         try:
