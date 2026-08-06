@@ -9,6 +9,10 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   * { box-sizing: border-box; }
+  html, body {
+    max-width: 100%;
+    overflow-x: hidden; /* jaring pengaman tambahan supaya halaman tidak melebar horizontal */
+  }
   body {
     font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     background: #0d1117;
@@ -163,15 +167,15 @@
   /* Grid Grafik (4 Horizontal Bar Chart Grid) */
   .grafik-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 16px;
     margin-bottom: 20px;
   }
   @media (max-width: 1200px) {
-    .grafik-grid { grid-template-columns: 1fr 1fr; }
+    .grafik-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 650px) {
-    .grafik-grid { grid-template-columns: 1fr; }
+    .grafik-grid { grid-template-columns: minmax(0, 1fr); }
   }
 
   .kartu-grafik {
@@ -182,11 +186,19 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    /* PENTING: grid/flex item punya min-width:auto secara default, sehingga
+       konten (canvas chart) bisa memaksa kolom grid melebar. min-width:0
+       memaksa kartu ini untuk selalu menyesuaikan lebar kolom yang tersedia,
+       bukan sebaliknya. Ini akar masalah "grafik keluar jalur". */
+    min-width: 0;
+    overflow: hidden;
   }
   .kartu-grafik h2 { font-size: 14px; margin: 0 0 10px; color: #c9d1d9; }
   .chart-container {
     position: relative;
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
     height: 220px;
     overflow: hidden;
   }
@@ -200,10 +212,14 @@
   .chart-container.scrollable .chart-inner {
     position: relative;
     width: 100%;
+    min-width: 0;
   }
   .chart-container.scrollable::-webkit-scrollbar { width: 6px; }
   .chart-container.scrollable::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
-  .kartu-grafik canvas { cursor: pointer; }
+  .kartu-grafik canvas {
+    cursor: pointer;
+    max-width: 100%;
+  }
   .petunjuk { color: #6e7681; font-size: 11px; margin-top: 6px; }
 
   /* Badge Sentimen */
@@ -610,6 +626,7 @@ function renderGrafikPerHari() {
       indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
+      resizeDelay: 100,
       plugins: { legend: { display: false } },
       scales: {
         x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true },
@@ -655,6 +672,7 @@ function renderGrafikSentimen() {
       indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
+      resizeDelay: 100,
       plugins: { legend: { display: false } },
       scales: {
         x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true },
@@ -694,7 +712,7 @@ function renderGrafikKategori() {
 
   const ctx = document.getElementById('grafik-kategori');
   // Tinggi canvas menyesuaikan jumlah label (minimal 24px per batang)
-  // supaya batang tidak terkompresi/tumpang tindih atau keluar jalur kartu.
+  // supaya batang tidak terkompresi/tumpang tindih atau keluar jalur dari kartu.
   const tinggiKategori = Math.max(220, label.length * 24);
   ctx.parentElement.style.height = tinggiKategori + 'px';
   if (chartKategori) chartKategori.destroy();
@@ -708,6 +726,7 @@ function renderGrafikKategori() {
       indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
+      resizeDelay: 100,
       plugins: { legend: { display: false } },
       scales: {
         x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true },
@@ -741,7 +760,7 @@ function renderGrafikMedia() {
 
   const ctx = document.getElementById('grafik-media');
   // Tinggi canvas menyesuaikan jumlah label (minimal 24px per batang)
-  // supaya batang tidak terkompresi/tumpang tindih atau keluar jalur kartu.
+  // supaya batang tidak terkompresi/tumpang tindih atau keluar jalur dari kartu.
   const tinggiMedia = Math.max(220, label.length * 24);
   ctx.parentElement.style.height = tinggiMedia + 'px';
   if (chartMedia) chartMedia.destroy();
@@ -755,6 +774,7 @@ function renderGrafikMedia() {
       indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
+      resizeDelay: 100,
       plugins: { legend: { display: false } },
       scales: {
         x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true },
