@@ -4,10 +4,9 @@ scrape_berita_rss.py
 ====================
 Skrip otomatisasi penarik berita:
 - Analisis Sentimen berbasis AI (IndoBERT via Hugging Face Transformers).
-- Menarik seluruh RSS Feed ANTARA News (17 Kanal) & RSS Detikcom.
-- Scraping halaman Indeks Kanal Detikcom hingga Halaman 3.
-- Scraping halaman Indeks Kompas.com hingga Halaman 3 (Diperbarui untuk mengambil seluruh berita secara presisi).
-- Ekstraksi nama Penulis/Author secara presisi.
+- Menarik seluruh RSS Feed ANTARA News, Detikcom, & CNN Indonesia.
+- Scraping halaman Indeks Kanal Detikcom & Kompas.com hingga Halaman 3.
+- Pemetaan kategori, ekstraksi gambar, penulis, dan sentimen secara akurat.
 - Menyimpan data kumulatif tanpa duplikat ke Excel per tanggal terbit & index.json.
 """
 
@@ -60,14 +59,12 @@ def analisa_sentimen(judul, ringkasan):
     if not teks:
         return "Netral"
     
-    # Potong teks maksimal 512 karakter sesuai konteks limit IndoBERT
     teks_input = teks[:512]
     
     try:
         hasil = sentimen_pipeline(teks_input)[0]
         label = str(hasil['label']).upper()
         
-        # Mapping label dari output model
         if "POS" in label or "LABEL_0" in label:
             return "Positif"
         elif "NEG" in label or "LABEL_2" in label:
@@ -102,6 +99,14 @@ FEEDS_RSS = {
     "detik-news":        {"url": "https://news.detik.com/rss", "media": "Detik", "kategori": "News"},
     "detik-finance":     {"url": "https://finance.detik.com/rss", "media": "Detik", "kategori": "Finance"},
     "detik-sport":       {"url": "https://sport.detik.com/rss", "media": "Detik", "kategori": "Sport"},
+
+    "cnn-nasional":      {"url": "https://www.cnnindonesia.com/nasional/rss", "media": "CNN Indonesia", "kategori": "Nasional"},
+    "cnn-internasional": {"url": "https://www.cnnindonesia.com/internasional/rss", "media": "CNN Indonesia", "kategori": "Internasional"},
+    "cnn-ekonomi":       {"url": "https://www.cnnindonesia.com/ekonomi/rss", "media": "CNN Indonesia", "kategori": "Ekonomi"},
+    "cnn-olahraga":      {"url": "https://www.cnnindonesia.com/olahraga/rss", "media": "CNN Indonesia", "kategori": "Olahraga"},
+    "cnn-teknologi":     {"url": "https://www.cnnindonesia.com/teknologi/rss", "media": "CNN Indonesia", "kategori": "Teknologi"},
+    "cnn-hiburan":       {"url": "https://www.cnnindonesia.com/hiburan/rss", "media": "CNN Indonesia", "kategori": "Hiburan"},
+    "cnn-gayahidup":     {"url": "https://www.cnnindonesia.com/gaya-hidup/rss", "media": "CNN Indonesia", "kategori": "Gaya Hidup"},
 }
 
 KANAL_INDEKS_DETIK = [
@@ -145,10 +150,10 @@ def format_tanggal_rfc2822(dt):
 
 def ekstraksi_detail_halaman(url, media_default=""):
     """
-    Mengunjungi URL halaman berita untuk mengambil:
+    Mengunjungi URL halaman berita untuk mengambil secara presisi:
     - Ringkasan / Deskripsi Meta
-    - URL Gambar Utama (OG Image)
-    - Nama Penulis secara eksplisit
+    - URL Gambar Utama (OG Image / Twitter Image)
+    - Nama Penulis / Author
     """
     ringkasan = ""
     url_gambar = ""
@@ -158,7 +163,7 @@ def ekstraksi_detail_halaman(url, media_default=""):
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.text, 'lxml')
             
-            # Ringkasan / Deskripsi
+            # 1. Ringkasan / Deskripsi
             meta_desc = soup.find('meta', attrs={'name': 'description'}) or \
                         soup.find('meta', attrs={'property': 'og:description'}) or \
                         soup.find('meta', attrs={'name': 'twitter:description'})
@@ -169,13 +174,13 @@ def ekstraksi_detail_halaman(url, media_default=""):
                 if p_first:
                     ringkasan = p_first.get_text(strip=True)
 
-            # URL Gambar
+            # 2. URL Gambar (Prioritas tinggi pada OpenGraph/Twitter Image agar konsisten)
             meta_img = soup.find('meta', attrs={'property': 'og:image'}) or \
                        soup.find('meta', attrs={'name': 'twitter:image'})
             if meta_img and meta_img.get('content'):
                 url_gambar = meta_img['content'].strip()
 
-            # Ekstraksi Penulis / Author
+            # 3. Ekstraksi Penulis / Author
             meta_auth = soup.find('meta', attrs={'name': 'author'}) or \
                         soup.find('meta', attrs={'name': 'baca-author'}) or \
                         soup.find('meta', attrs={'property': 'article:author'}) or \
@@ -192,7 +197,7 @@ def ekstraksi_detail_halaman(url, media_default=""):
             # Pembersihan string Penulis
             if penulis:
                 penulis = re.sub(r'^(Oleh|By|Penulis|Reporter)\s*:\s*', '', penulis, flags=re.I)
-                penulis = re.sub(r'\s*-\s*(detik|Kompas|ANTARA).*$', '', penulis, flags=re.I)
+                penulis = re.sub(r'\s*-\s*(detik|Kompas|ANTARA|CNN).*$', '', penulis, flags=re.I)
                 penulis = penulis.strip()
 
     except Exception:
@@ -207,7 +212,7 @@ def ekstraksi_detail_halaman(url, media_default=""):
 # MODUL SCRAPING
 # ----------------------------------------------------------------------
 def ambil_rss(feed_info):
-    """Ekstraksi berita dari Feed RSS + Penulis & Sentimen IndoBERT"""
+    """Ekstraksi berita dari Feed RSS (Antara, Detik, CNN) + Fallback Detail"""
     hasil = []
     try:
         resp = requests.get(feed_info["url"], headers=HEADERS, timeout=20)
@@ -243,18 +248,7 @@ def ambil_rss(feed_info):
 
             deskripsi = clean_html(raw_desc)
             
-            # Jika Penulis / Ringkasan belum lengkap dari RSS, baca langsung dari URL
-            if not penulis or len(deskripsi) < 30:
-                detail_desc, _, detail_penulis = ekstraksi_detail_halaman(link, media_default=feed_info["media"])
-                if not penulis and detail_penulis:
-                    penulis = detail_penulis
-                if len(deskripsi) < 30 and detail_desc:
-                    deskripsi = detail_desc
-
-            if not penulis:
-                penulis = f"Redaksi {feed_info['media']}"
-
-            # Gambar
+            # Gambar dari RSS (Enclosure / Media Content / Regex dalam Desc)
             url_gambar = ""
             enclosure = item.find("enclosure")
             if enclosure is not None and enclosure.get("url"):
@@ -268,7 +262,19 @@ def ambil_rss(feed_info):
                 if match_img:
                     url_gambar = match_img.group(1)
 
-            # Analisis Sentimen AI
+            # Jika detail halaman (penulis/gambar/deskripsi) kurang lengkap, lakukan kunjungan halaman langsung
+            if not penulis or len(deskripsi) < 30 or not url_gambar:
+                detail_desc, detail_img, detail_penulis = ekstraksi_detail_halaman(link, media_default=feed_info["media"])
+                if not penulis and detail_penulis:
+                    penulis = detail_penulis
+                if len(deskripsi) < 30 and detail_desc:
+                    deskripsi = detail_desc
+                if not url_gambar and detail_img:
+                    url_gambar = detail_img
+
+            if not penulis:
+                penulis = f"Redaksi {feed_info['media']}"
+
             sentimen = analisa_sentimen(judul, deskripsi)
 
             hasil.append({
@@ -287,7 +293,7 @@ def ambil_rss(feed_info):
     return hasil
 
 def ambil_indeks_detik(subdomain, kategori_nama, max_page=3):
-    """Scraping Indeks Detikcom + Penulis & Sentimen IndoBERT"""
+    """Scraping Indeks Kanal Detikcom"""
     hasil = []
     tgl_now = datetime.now().strftime("%m/%d/%Y")
     
@@ -340,7 +346,7 @@ def ambil_indeks_detik(subdomain, kategori_nama, max_page=3):
     return hasil
 
 def ambil_indeks_kompas(max_page=3):
-    """Scraping Indeks Kompas.com secara fleksibel & presisi + Penulis & Sentimen IndoBERT"""
+    """Scraping Indeks Kompas.com secara fleksibel & presisi"""
     hasil = []
     seen_links = set()
     tgl_now = datetime.now().strftime("%Y-%m-%d")
@@ -354,13 +360,11 @@ def ambil_indeks_kompas(max_page=3):
                 
             soup = BeautifulSoup(resp.text, 'lxml')
             
-            # Perluas pencarian kontainer artikel Kompas agar mampu menangkap berbagai variasi class layout
             articles = (
                 soup.find_all('div', class_=re.compile(r'article__list|articleList|article__item')) or
                 soup.find_all('div', class_='neath-item')
             )
             
-            # Jika kontainer spesifik kosong, langsung ekstrak semua tag 'a' yang menuju ke halaman berita kompas
             if not articles:
                 link_candidates = soup.find_all('a', href=re.compile(r'https?://[a-zA-Z0-9.-]*kompas\.com/read/\d{4}/\d{2}/\d{2}/\d+'))
                 for a in link_candidates:
@@ -469,8 +473,8 @@ def main():
     print("=== MULAI SCRAPING BERITA AUTOMATIS + AI SENTIMEN (INDOBERT) ===\n")
     semua_berita = []
 
-    # 1. Ambil RSS Feeds
-    print("1. Mengambil Feed RSS (ANTARA & Detik RSS)...")
+    # 1. Ambil RSS Feeds (Antara, Detik, & CNN Indonesia)
+    print("1. Mengambil Feed RSS (ANTARA, Detik, & CNN Indonesia)...")
     for key, feed_info in FEEDS_RSS.items():
         print(f"   - [{feed_info['media']}] Kanal '{feed_info['kategori']}'...", end=" ")
         berita = ambil_rss(feed_info)
@@ -478,7 +482,7 @@ def main():
         semua_berita.extend(berita)
         time.sleep(0.1)
 
-    # 2. Scraping Indeks Detikcom
+    # 2. Scraping Indeks Kanal Detikcom
     print(f"\n2. Mengambil Indeks Kanal Detikcom (Halaman 1-{MAX_PAGE_INDEKS})...")
     for k_detik in KANAL_INDEKS_DETIK:
         print(f"   - [Detik] Indeks {k_detik['kategori']} ({k_detik['subdomain']}.detik.com)...", end=" ")
@@ -529,7 +533,7 @@ def main():
     with open(os.path.join(OUTPUT_FOLDER, "index.json"), "w", encoding="utf-8") as f:
         json.dump(daftar, f, ensure_ascii=False, indent=2)
 
-    print("\n=== PROSES SELESAI! INDOBERT BERHASIL MEMPROSES SEMUA BERITA ===")
+    print("\n=== PROSES SELESAI! SEMUA DATA & KATEGORI BERHASIL DISINKRONKAN ===")
 
 if __name__ == "__main__":
     main()
