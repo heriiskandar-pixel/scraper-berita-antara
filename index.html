@@ -447,6 +447,28 @@ const WARNA_NORMAL = '#30363d';
 const WARNA_AKTIF = '#58a6ff';
 const WARNA_SENTIMEN = { 'Positif': '#238636', 'Negatif': '#da3633', 'Netral': '#8b949e' };
 
+// Palet gradasi per-grafik, mengikuti aksen warna tema gelap (GitHub dark style)
+const TEMA_GRADASI = {
+  hari:            { mulai: '#1f6feb', akhir: '#79c0ff' }, // biru
+  kategori:        { mulai: '#6e40c9', akhir: '#c297ff' }, // ungu
+  media:           { mulai: '#9a6700', akhir: '#f2cc60' }, // kuning/emas
+  sentimenPositif: { mulai: '#196c2e', akhir: '#56d364' }, // hijau
+  sentimenNegatif: { mulai: '#8e1519', akhir: '#ff7b72' }, // merah
+  sentimenNetral:  { mulai: '#484f58', akhir: '#c9d1d9' }  // abu-abu
+};
+const WARNA_REDUP = 'rgba(110,118,129,0.25)'; // warna batang yang tidak terpilih saat ada filter aktif
+
+// Membuat gradasi horizontal (kiri->kanan) menyesuaikan area chart yang sebenarnya.
+// Chart.js baru punya chartArea setelah layout pertama, jadi fungsi ini dipakai
+// sebagai "scriptable option" yang dievaluasi ulang tiap render/resize.
+function buatGradientHorizontal(ctx, chartArea, warnaMulai, warnaAkhir) {
+  if (!chartArea) return warnaAkhir; // fallback sebelum chartArea siap
+  const gradient = ctx.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
+  gradient.addColorStop(0, warnaMulai);
+  gradient.addColorStop(1, warnaAkhir);
+  return gradient;
+}
+
 // Format Tanggal Ke: d mmm yyyy, hh:mm:ss
 function formatTanggalIndo(dateObj) {
   const bulanIndo = [
@@ -612,7 +634,6 @@ function renderGrafikPerHari() {
   }
   const label = Object.keys(hitung).sort();
   const nilai = label.map(l => hitung[l]);
-  const warna = label.map(l => l === filterTanggal ? WARNA_AKTIF : WARNA_NORMAL);
 
   const ctx = document.getElementById('grafik-per-hari');
   if (chartHari) chartHari.destroy();
@@ -620,7 +641,17 @@ function renderGrafikPerHari() {
     type: 'bar',
     data: {
       labels: label,
-      datasets: [{ label: 'Berita', data: nilai, backgroundColor: warna, borderRadius: 4 }]
+      datasets: [{
+        label: 'Berita',
+        data: nilai,
+        backgroundColor: (context) => {
+          const { chart, dataIndex } = context;
+          const { ctx: c, chartArea } = chart;
+          if (filterTanggal && label[dataIndex] !== filterTanggal) return WARNA_REDUP;
+          return buatGradientHorizontal(c, chartArea, TEMA_GRADASI.hari.mulai, TEMA_GRADASI.hari.akhir);
+        },
+        borderRadius: 4
+      }]
     },
     options: {
       indexAxis: 'y',
@@ -655,10 +686,11 @@ function renderGrafikSentimen() {
 
   const label = Object.keys(hitung);
   const nilai = Object.values(hitung);
-  const bgWarna = label.map(l => {
-    if (filterSentimen) return l === filterSentimen ? WARNA_SENTIMEN[l] : WARNA_NORMAL;
-    return WARNA_SENTIMEN[l];
-  });
+  const temaPerLabel = {
+    'Positif': TEMA_GRADASI.sentimenPositif,
+    'Negatif': TEMA_GRADASI.sentimenNegatif,
+    'Netral': TEMA_GRADASI.sentimenNetral
+  };
 
   const ctx = document.getElementById('grafik-sentimen');
   if (chartSentimen) chartSentimen.destroy();
@@ -666,7 +698,19 @@ function renderGrafikSentimen() {
     type: 'bar',
     data: {
       labels: label,
-      datasets: [{ label: 'Sentimen', data: nilai, backgroundColor: bgWarna, borderRadius: 4 }]
+      datasets: [{
+        label: 'Sentimen',
+        data: nilai,
+        backgroundColor: (context) => {
+          const { chart, dataIndex } = context;
+          const { ctx: c, chartArea } = chart;
+          const lbl = label[dataIndex];
+          if (filterSentimen && lbl !== filterSentimen) return WARNA_REDUP;
+          const tema = temaPerLabel[lbl];
+          return buatGradientHorizontal(c, chartArea, tema.mulai, tema.akhir);
+        },
+        borderRadius: 4
+      }]
     },
     options: {
       indexAxis: 'y',
@@ -708,7 +752,6 @@ function renderGrafikKategori() {
   const sortedKat = Object.entries(hitung).sort((a, b) => b[1] - a[1]);
   const label = sortedKat.map(item => item[0]);
   const nilai = sortedKat.map(item => item[1]);
-  const warna = label.map(l => l === filterKategori ? WARNA_AKTIF : WARNA_NORMAL);
 
   const ctx = document.getElementById('grafik-kategori');
   // Tinggi canvas menyesuaikan jumlah label (minimal 24px per batang)
@@ -720,7 +763,17 @@ function renderGrafikKategori() {
     type: 'bar',
     data: {
       labels: label,
-      datasets: [{ label: 'Kategori', data: nilai, backgroundColor: warna, borderRadius: 4 }]
+      datasets: [{
+        label: 'Kategori',
+        data: nilai,
+        backgroundColor: (context) => {
+          const { chart, dataIndex } = context;
+          const { ctx: c, chartArea } = chart;
+          if (filterKategori && label[dataIndex] !== filterKategori) return WARNA_REDUP;
+          return buatGradientHorizontal(c, chartArea, TEMA_GRADASI.kategori.mulai, TEMA_GRADASI.kategori.akhir);
+        },
+        borderRadius: 4
+      }]
     },
     options: {
       indexAxis: 'y',
@@ -756,7 +809,6 @@ function renderGrafikMedia() {
   const sortedMedia = Object.entries(hitung).sort((a, b) => b[1] - a[1]);
   const label = sortedMedia.map(item => item[0]);
   const nilai = sortedMedia.map(item => item[1]);
-  const warna = label.map(l => l === filterMedia ? WARNA_AKTIF : WARNA_NORMAL);
 
   const ctx = document.getElementById('grafik-media');
   // Tinggi canvas menyesuaikan jumlah label (minimal 24px per batang)
@@ -768,7 +820,17 @@ function renderGrafikMedia() {
     type: 'bar',
     data: {
       labels: label,
-      datasets: [{ label: 'Media', data: nilai, backgroundColor: warna, borderRadius: 4 }]
+      datasets: [{
+        label: 'Media',
+        data: nilai,
+        backgroundColor: (context) => {
+          const { chart, dataIndex } = context;
+          const { ctx: c, chartArea } = chart;
+          if (filterMedia && label[dataIndex] !== filterMedia) return WARNA_REDUP;
+          return buatGradientHorizontal(c, chartArea, TEMA_GRADASI.media.mulai, TEMA_GRADASI.media.akhir);
+        },
+        borderRadius: 4
+      }]
     },
     options: {
       indexAxis: 'y',
