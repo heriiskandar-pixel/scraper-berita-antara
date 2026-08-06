@@ -4,8 +4,8 @@ scrape_berita_rss.py
 ====================
 Skrip otomatisasi penarik berita:
 - Analisis Sentimen berbasis AI (IndoBERT via Hugging Face Transformers).
-- Menarik seluruh RSS Feed ANTARA News, Detikcom, & CNN Indonesia.
-- Scraping halaman Indeks Kanal Detikcom & Kompas.com hingga Halaman 3.
+- Menarik RSS Feed ANTARA News & Detikcom.
+- Scraping halaman Indeks Kanal Detikcom, Kompas.com, & CNN Indonesia hingga Halaman 3.
 - Pemetaan kategori, ekstraksi gambar, penulis, dan sentimen secara akurat.
 - Menyimpan data kumulatif tanpa duplikat ke Excel per tanggal terbit & index.json.
 """
@@ -99,14 +99,6 @@ FEEDS_RSS = {
     "detik-news":        {"url": "https://news.detik.com/rss", "media": "Detik", "kategori": "News"},
     "detik-finance":     {"url": "https://finance.detik.com/rss", "media": "Detik", "kategori": "Finance"},
     "detik-sport":       {"url": "https://sport.detik.com/rss", "media": "Detik", "kategori": "Sport"},
-
-    "cnn-nasional":      {"url": "https://www.cnnindonesia.com/nasional/rss", "media": "CNN Indonesia", "kategori": "Nasional"},
-    "cnn-internasional": {"url": "https://www.cnnindonesia.com/internasional/rss", "media": "CNN Indonesia", "kategori": "Internasional"},
-    "cnn-ekonomi":       {"url": "https://www.cnnindonesia.com/ekonomi/rss", "media": "CNN Indonesia", "kategori": "Ekonomi"},
-    "cnn-olahraga":      {"url": "https://www.cnnindonesia.com/olahraga/rss", "media": "CNN Indonesia", "kategori": "Olahraga"},
-    "cnn-teknologi":     {"url": "https://www.cnnindonesia.com/teknologi/rss", "media": "CNN Indonesia", "kategori": "Teknologi"},
-    "cnn-hiburan":       {"url": "https://www.cnnindonesia.com/hiburan/rss", "media": "CNN Indonesia", "kategori": "Hiburan"},
-    "cnn-gayahidup":     {"url": "https://www.cnnindonesia.com/gaya-hidup/rss", "media": "CNN Indonesia", "kategori": "Gaya Hidup"},
 }
 
 KANAL_INDEKS_DETIK = [
@@ -149,12 +141,7 @@ def format_tanggal_rfc2822(dt):
     return dt.strftime("%a, %d %b %Y %H:%M:%S %z")
 
 def ekstraksi_detail_halaman(url, media_default=""):
-    """
-    Mengunjungi URL halaman berita untuk mengambil secara presisi:
-    - Ringkasan / Deskripsi Meta
-    - URL Gambar Utama (OG Image / Twitter Image)
-    - Nama Penulis / Author
-    """
+    """Mengunjungi URL halaman berita untuk mengambil ringkasan, gambar utama, dan penulis."""
     ringkasan = ""
     url_gambar = ""
     penulis = ""
@@ -163,7 +150,6 @@ def ekstraksi_detail_halaman(url, media_default=""):
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.text, 'lxml')
             
-            # 1. Ringkasan / Deskripsi
             meta_desc = soup.find('meta', attrs={'name': 'description'}) or \
                         soup.find('meta', attrs={'property': 'og:description'}) or \
                         soup.find('meta', attrs={'name': 'twitter:description'})
@@ -174,13 +160,11 @@ def ekstraksi_detail_halaman(url, media_default=""):
                 if p_first:
                     ringkasan = p_first.get_text(strip=True)
 
-            # 2. URL Gambar (Prioritas tinggi pada OpenGraph/Twitter Image agar konsisten)
             meta_img = soup.find('meta', attrs={'property': 'og:image'}) or \
                        soup.find('meta', attrs={'name': 'twitter:image'})
             if meta_img and meta_img.get('content'):
                 url_gambar = meta_img['content'].strip()
 
-            # 3. Ekstraksi Penulis / Author
             meta_auth = soup.find('meta', attrs={'name': 'author'}) or \
                         soup.find('meta', attrs={'name': 'baca-author'}) or \
                         soup.find('meta', attrs={'property': 'article:author'}) or \
@@ -194,7 +178,6 @@ def ekstraksi_detail_halaman(url, media_default=""):
                 if elem_author:
                     penulis = elem_author.get_text(strip=True)
 
-            # Pembersihan string Penulis
             if penulis:
                 penulis = re.sub(r'^(Oleh|By|Penulis|Reporter)\s*:\s*', '', penulis, flags=re.I)
                 penulis = re.sub(r'\s*-\s*(detik|Kompas|ANTARA|CNN).*$', '', penulis, flags=re.I)
@@ -212,7 +195,7 @@ def ekstraksi_detail_halaman(url, media_default=""):
 # MODUL SCRAPING
 # ----------------------------------------------------------------------
 def ambil_rss(feed_info):
-    """Ekstraksi berita dari Feed RSS (Antara, Detik, CNN) + Fallback Detail"""
+    """Ekstraksi berita dari Feed RSS (Antara, Detik)"""
     hasil = []
     try:
         resp = requests.get(feed_info["url"], headers=HEADERS, timeout=20)
@@ -238,7 +221,6 @@ def ambil_rss(feed_info):
             cat_xml = item.findtext("category")
             kategori_berita = cat_xml.strip().capitalize() if cat_xml and cat_xml.strip() else feed_info["kategori"]
 
-            # Penulis
             penulis = ""
             for tag_auth in ["dc:creator", "author", "creator"]:
                 found_p = item.findtext(tag_auth, namespaces=namespaces) or item.findtext(tag_auth)
@@ -248,7 +230,6 @@ def ambil_rss(feed_info):
 
             deskripsi = clean_html(raw_desc)
             
-            # Gambar dari RSS (Enclosure / Media Content / Regex dalam Desc)
             url_gambar = ""
             enclosure = item.find("enclosure")
             if enclosure is not None and enclosure.get("url"):
@@ -262,7 +243,6 @@ def ambil_rss(feed_info):
                 if match_img:
                     url_gambar = match_img.group(1)
 
-            # Jika detail halaman (penulis/gambar/deskripsi) kurang lengkap, lakukan kunjungan halaman langsung
             if not penulis or len(deskripsi) < 30 or not url_gambar:
                 detail_desc, detail_img, detail_penulis = ekstraksi_detail_halaman(link, media_default=feed_info["media"])
                 if not penulis and detail_penulis:
@@ -437,6 +417,67 @@ def ambil_indeks_kompas(max_page=3):
 
     return hasil
 
+def ambil_indeks_cnn(max_page=3):
+    """Scraping Indeks CNN Indonesia secara langsung"""
+    hasil = []
+    seen_links = set()
+    
+    for page in range(1, max_page + 1):
+        url = f"https://www.cnnindonesia.com/nasional/indeks/{page}"
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=15)
+            if resp.status_code != 200:
+                break
+                
+            soup = BeautifulSoup(resp.text, 'lxml')
+            articles = soup.find_all('article')
+            
+            for art in articles:
+                tag_a = art.find('a', href=True)
+                if not tag_a: 
+                    continue
+                
+                link = tag_a['href']
+                if link in seen_links: 
+                    continue
+                seen_links.add(link)
+
+                tag_title = art.find('h2') or art.find('h3') or tag_a
+                judul = tag_title.get_text(strip=True) if tag_title else ""
+                if len(judul) < 10: 
+                    continue
+
+                tag_img = art.find('img')
+                url_gambar = ""
+                if tag_img:
+                    url_gambar = tag_img.get('src') or tag_img.get('data-src') or ""
+
+                tag_cat = art.find('span', class_=re.compile(r'kanal|category'))
+                kategori = tag_cat.get_text(strip=True) if tag_cat else "Nasional"
+
+                ringkasan, img_detail, penulis = ekstraksi_detail_halaman(link, media_default="CNN Indonesia")
+                if not url_gambar:
+                    url_gambar = img_detail
+
+                sentimen = analisa_sentimen(judul, ringkasan)
+
+                hasil.append({
+                    "Kategori": kategori,
+                    "Judul": judul,
+                    "Tanggal Terbit": format_tanggal_rfc2822(datetime.now(timezone(timedelta(hours=7)))),
+                    "Penulis": penulis,
+                    "Ringkasan": ringkasan,
+                    "Sentimen": sentimen,
+                    "Link": link,
+                    "URL Gambar": url_gambar,
+                    "Media": "CNN Indonesia"
+                })
+                time.sleep(0.05)
+        except Exception as e:
+            print(f"Gagal scraping indeks CNN hal {page}: {e}")
+
+    return hasil
+
 # ----------------------------------------------------------------------
 # PENYIMPANAN DATA KE EXCEL
 # ----------------------------------------------------------------------
@@ -473,8 +514,8 @@ def main():
     print("=== MULAI SCRAPING BERITA AUTOMATIS + AI SENTIMEN (INDOBERT) ===\n")
     semua_berita = []
 
-    # 1. Ambil RSS Feeds (Antara, Detik, & CNN Indonesia)
-    print("1. Mengambil Feed RSS (ANTARA, Detik, & CNN Indonesia)...")
+    # 1. Ambil RSS Feeds (Antara & Detik)
+    print("1. Mengambil Feed RSS (ANTARA & Detik)...")
     for key, feed_info in FEEDS_RSS.items():
         print(f"   - [{feed_info['media']}] Kanal '{feed_info['kategori']}'...", end=" ")
         berita = ambil_rss(feed_info)
@@ -497,6 +538,12 @@ def main():
     print(f"{len(kompas_berita)} berita")
     semua_berita.extend(kompas_berita)
 
+    # 4. Scraping Indeks CNN Indonesia
+    print(f"\n4. Mengambil Indeks CNN Indonesia (Halaman 1-{MAX_PAGE_INDEKS})...", end=" ")
+    cnn_berita = ambil_indeks_cnn(max_page=MAX_PAGE_INDEKS)
+    print(f"{len(cnn_berita)} berita")
+    semua_berita.extend(cnn_berita)
+
     if not semua_berita:
         print("\nTidak ada berita yang berhasil diambil.")
         return
@@ -504,7 +551,6 @@ def main():
     df = pd.DataFrame(semua_berita)
     df.drop_duplicates(subset=["Link"], keep="first", inplace=True)
 
-    # Parsing & Filter Umur Berita
     df["_tanggal_parsed"] = df["Tanggal Terbit"].apply(parse_tanggal)
     now = datetime.now(timezone.utc)
     batas_lama = now - timedelta(days=MAKS_UMUR_HARI)
@@ -520,20 +566,19 @@ def main():
     df["_tanggal_file"] = df["_tanggal_parsed"].apply(lambda d: d.date().isoformat())
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-    print("\n4. Menyimpan & Menggabungkan Hasil ke File Excel...")
+    print("\n5. Menyimpan & Menggabungkan Hasil ke File Excel...")
     for tanggal_file, grup in df.groupby("_tanggal_file"):
         grup_clean = grup.drop(columns=["_tanggal_parsed", "_tanggal_file"])
         path_output = os.path.join(OUTPUT_FOLDER, f"{FILENAME_PREFIX}_{tanggal_file}.xlsx")
         simpan_excel(grup_clean, path_output)
         print(f"   - Update File: {path_output}")
 
-    # Update index.json untuk Dashboard
     daftar = [{"file": f, "tanggal": f.replace(f"{FILENAME_PREFIX}_", "").replace(".xlsx", "")}
               for f in os.listdir(OUTPUT_FOLDER) if f.endswith(".xlsx")]
     with open(os.path.join(OUTPUT_FOLDER, "index.json"), "w", encoding="utf-8") as f:
         json.dump(daftar, f, ensure_ascii=False, indent=2)
 
-    print("\n=== PROSES SELESAI! SEMUA DATA & KATEGORI BERHASIL DISINKRONKAN ===")
+    print("\n=== PROSES SELESAI! SEMUA SUMBER MEDIA BERHASIL DIMUAT ===")
 
 if __name__ == "__main__":
     main()
