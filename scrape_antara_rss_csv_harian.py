@@ -7,7 +7,7 @@ Skrip otomatisasi penarik berita:
 - Menarik RSS Feed ANTARA News, Detikcom, CNN Indonesia, Tribunnews, CNBC Indonesia, Kontan, Tempo, & Republika.
 - Scraping halaman Indeks Kanal Detikcom & Kompas.com hingga Halaman 3.
 - Pemetaan kategori, ekstraksi gambar, penulis, dan sentimen secara akurat.
-- Menyimpan data kumulatif tanpa duplikat ke Excel per tanggal terbit & index.json.
+- Menyimpan data kumulatif tanpa duplikat ke dalam satu file semua_berita.json.
 """
 
 import os
@@ -28,7 +28,7 @@ from transformers import pipeline
 # PENGATURAN GLOBAL
 # ----------------------------------------------------------------------
 OUTPUT_FOLDER = "data"
-FILENAME_PREFIX = "berita"
+FILENAME_JSON = "semua_berita.json"
 MAKS_UMUR_HARI = 7
 MAX_PAGE_INDEKS = 3
 MAX_WORKERS = 12
@@ -506,35 +506,6 @@ def ambil_indeks_kompas(max_page=3):
     return hasil
 
 # ----------------------------------------------------------------------
-# PENYIMPANAN DATA KE EXCEL
-# ----------------------------------------------------------------------
-def simpan_excel(df, path_output):
-    from openpyxl.styles import Font
-    from openpyxl.utils import get_column_letter
-    
-    if os.path.exists(path_output):
-        try:
-            df_lama = pd.read_excel(path_output)
-            df = pd.concat([df_lama, df], ignore_index=True)
-            df.drop_duplicates(subset=["Link"], keep="first", inplace=True)
-        except Exception as e:
-            print(f"Gagal membaca Excel lama ({path_output}): {e}")
-
-    kolom_urut = ["Kategori", "Judul", "Tanggal Terbit", "Penulis", "Ringkasan", "Sentimen", "Link", "URL Gambar", "Media"]
-    df = df.reindex(columns=[c for c in kolom_urut if c in df.columns])
-
-    with pd.ExcelWriter(path_output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Berita")
-        ws = writer.sheets["Berita"]
-        for cell in ws[1]:
-            cell.font = Font(bold=True)
-        for idx, col in enumerate(df.columns, start=1):
-            panjang = max([len(str(col))] + [len(str(v)) for v in df[col].astype(str).tolist()[:200]])
-            ws.column_dimensions[get_column_letter(idx)].width = min(max(panjang + 2, 10), 60)
-        ws.auto_filter.ref = ws.dimensions
-        ws.freeze_panes = "A2"
-
-# ----------------------------------------------------------------------
 # MAIN FUNCTION
 # ----------------------------------------------------------------------
 def main():
@@ -581,21 +552,35 @@ def main():
         return
 
     df["Tanggal Terbit"] = df["_tanggal_parsed"].apply(format_tanggal_rfc2822)
-    df["_tanggal_file"] = df["_tanggal_parsed"].apply(lambda d: d.date().isoformat())
+    
+    # Bersihkan kolom bantu sebelum dimasukkan ke JSON
+    df = df.drop(columns=["_tanggal_parsed"])
+    
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+    path_output = os.path.join(OUTPUT_FOLDER, FILENAME_JSON)
 
-    print("\n4. Menyimpan & Menggabungkan Hasil ke File Excel...")
-    for tanggal_file, grup in df.groupby("_tanggal_file"):
-        grup_clean = grup.drop(columns=["_tanggal_parsed", "_tanggal_file"])
-        path_output = os.path.join(OUTPUT_FOLDER, f"{FILENAME_PREFIX}_{tanggal_file}.xlsx")
-        simpan_excel(grup_clean, path_output)
-        print(f"   - Update File: {path_output}")
+    print("\n4. Menyimpan Hasil ke File JSON...")
+    
+    # Jika file JSON lama sudah ada, gabungkan data lama dengan data baru tanpa duplikat berdasarkan Link
+    data_final = df.to_dict(orient="records")
+    if os.path.exists(path_output):
+        try:
+            with open(path_output, "r", encoding="utf-8") as f:
+                data_lama = json.load(f)
+            
+            # Gabungkan menggunakan dictionary dengan key "Link" untuk menghindari duplikasi
+            existing_links = {item["Link"]: item for item in data_lama}
+            for item in data_final:
+                existing_links[item["Link"]] = item
+            
+            data_final = list(existing_links.values())
+        except Exception as e:
+            print(f"Peringatan: Gagal membaca file JSON lama ({e}), menimpa dengan data baru.")
 
-    daftar = [{"file": f, "tanggal": f.replace(f"{FILENAME_PREFIX}_", "").replace(".xlsx", "")}
-              for f in os.listdir(OUTPUT_FOLDER) if f.endswith(".xlsx")]
-    with open(os.path.join(OUTPUT_FOLDER, "index.json"), "w", encoding="utf-8") as f:
-        json.dump(daftar, f, ensure_ascii=False, indent=2)
+    with open(path_output, "w", encoding="utf-8") as f:
+        json.dump(data_final, f, ensure_ascii=False, indent=2)
 
+    print(f"   - Berhasil menyimpan total {len(data_final)} berita ke: {path_output}")
     print("\n=== PROSES SELESAI! SEMUA SUMBER MEDIA BERHASIL DIMUAT ===")
 
 if __name__ == "__main__":
