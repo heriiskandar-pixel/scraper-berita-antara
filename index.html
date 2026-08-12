@@ -453,7 +453,6 @@ function formatTanggalIndo(dateObj) {
   return `${d} ${mmm} ${yyyy}, ${hh}:${mm}:${ss}`;
 }
 
-// Mendapatkan format tanggal hari ini misal: "2026-06-06" (sesuaikan dengan format string tanggal pada file data/index.json Anda)
 function getTanggalHariIniFormat() {
   const sekarang = new Date();
   const yyyy = sekarang.getFullYear();
@@ -472,52 +471,39 @@ function escapeHtml(str) {
 
 async function muatSemuaData() {
   try {
-    const res = await fetch('data/index.json?_=' + Date.now());
-    if (!res.ok) throw new Error('index.json tidak ditemukan');
+    // Memuat data dari satu file JSON terpusat untuk performa yang sangat cepat
+    const res = await fetch('data/semua_berita.json?_=' + Date.now());
+    if (!res.ok) throw new Error('File data/semua_berita.json tidak ditemukan');
     
     const lastModified = res.headers.get('Last-Modified');
     const tglUpdate = lastModified ? new Date(lastModified) : new Date();
     elWaktuUpdate.textContent = formatTanggalIndo(tglUpdate);
 
-    const daftar = await res.json();  
+    semuaData = await res.json();  
 
-    if (daftar.length === 0) {
-      elStatus.textContent = 'Belum ada file berita tersedia.';
+    if (semuaData.length === 0) {
+      elStatus.textContent = 'Belum ada data berita tersedia.';
       return;
     }
 
-    // Sort daftar tanggal sesuai urutan kalender terbaru (Descending: dari tanggal terbaru ke terlama. Ubah ke `<` jika ingin dari terlama ke terbaru)
-    daftar.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+    // Ambil daftar tanggal unik dari data dan urutkan secara kalender terbaru
+    const tanggalSet = new Set();
+    semuaData.forEach(b => {
+      const tgl = b._tanggalFile || b['Tanggal'] || '';
+      if (tgl) tanggalSet.add(tgl);
+    });
+
+    const daftarTanggal = Array.from(tanggalSet).sort((a, b) => new Date(b) - new Date(a));
 
     elPilihTanggal.innerHTML = '<option value="">Semua Tanggal</option>' +
-      daftar.map(d => `<option value="${escapeHtml(d.tanggal)}">${escapeHtml(d.tanggal)}</option>`).join('');
+      daftarTanggal.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
 
-    // Set nilai default filter tanggal menjadi hari ini (jika tanggal hari ini ada di dalam list data)
+    // Set nilai default filter tanggal menjadi hari ini jika tersedia
     const tglHariIni = getTanggalHariIniFormat();
-    const isAdaHariIni = daftar.some(d => d.tanggal === tglHariIni);
-    
-    if (isAdaHariIni) {
+    if (tanggalSet.has(tglHariIni)) {
       filterTanggal = tglHariIni;
       elPilihTanggal.value = tglHariIni;
     }
-
-    elStatus.textContent = `Memuat ${daftar.length} file...`;
-
-    const hasil = await Promise.all(daftar.map(async d => {
-      try {
-        const r = await fetch('data/' + d.file + '?_=' + Date.now());
-        if (!r.ok) return [];
-        const buffer = await r.arrayBuffer();
-        const wb = XLSX.read(buffer, { type: 'array' });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        const baris = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-        return baris.map(b => ({ ...b, _tanggalFile: d.tanggal }));
-      } catch (e) {
-        return [];
-      }
-    }));
-
-    semuaData = hasil.flat();
 
     populateFilterOptions();
     renderSemua();
@@ -564,7 +550,8 @@ function dataTersaring() {
   const kataKunci = elCari.value.trim().toLowerCase();
   return semuaData.filter(b => {
     if (!cocokPencarian(b, kataKunci)) return false;
-    if (filterTanggal && b._tanggalFile !== filterTanggal) return false;
+    const tglBaris = b._tanggalFile || b['Tanggal'] || '';
+    if (filterTanggal && tglBaris !== filterTanggal) return false;
     if (filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
     if (filterSentimen && String(b['Sentimen'] ?? '').trim() !== filterSentimen) return false;
     if (filterMedia && String(b['Media'] ?? '').trim() !== filterMedia) return false;
@@ -576,7 +563,8 @@ function dataAbaikanFilter(field) {
   const kataKunci = elCari.value.trim().toLowerCase();
   return semuaData.filter(b => {
     if (!cocokPencarian(b, kataKunci)) return false;
-    if (field !== 'tanggal' && filterTanggal && b._tanggalFile !== filterTanggal) return false;
+    const tglBaris = b._tanggalFile || b['Tanggal'] || '';
+    if (field !== 'tanggal' && filterTanggal && tglBaris !== filterTanggal) return false;
     if (field !== 'kategori' && filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
     if (field !== 'sentimen' && filterSentimen && String(b['Sentimen'] ?? '').trim() !== filterSentimen) return false;
     if (field !== 'media' && filterMedia && String(b['Media'] ?? '').trim() !== filterMedia) return false;
@@ -611,9 +599,9 @@ function renderGrafikPerHari() {
   const data = dataAbaikanFilter('tanggal');
   const hitung = {};
   for (const b of data) {
-    hitung[b._tanggalFile] = (hitung[b._tanggalFile] || 0) + 1;
+    const tgl = b._tanggalFile || b['Tanggal'] || 'Tanpa Tanggal';
+    hitung[tgl] = (hitung[tgl] || 0) + 1;
   }
-  // Urutkan label tanggal secara kalender terbaru (ascending untuk sumbu Y chart)
   const label = Object.keys(hitung).sort((a, b) => new Date(a) - new Date(b));
   const nilai = label.map(l => hitung[l]);
 
@@ -878,6 +866,7 @@ function renderTampilanUtama() {
 }
 
 function renderTabel(data) {
+  if (semuaData.length === 0) return;
   const kolom = Object.keys(semuaData[0]).filter(k => k !== '_tanggalFile' && k !== 'Link');
 
   let html = '<table><thead><tr>';
