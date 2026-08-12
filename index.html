@@ -394,7 +394,7 @@
 
 <script>
 let semuaData = [];        
-let filterTanggal = null;  
+let filterTanggal = getTanggalHariIniFormat(); // Set default filter tanggal ke hari ini
 let filterKategori = null; 
 let filterSentimen = null; 
 let filterMedia = null;
@@ -461,13 +461,10 @@ function getTanggalHariIniFormat() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-// Fungsi untuk mengekstrak string tanggal dari berbagai nama kolom yang mungkin ada
 function ambilTanggalBaris(b) {
   const mentah = b._tanggalFile || b['Tanggal Terbit'] || b['Tanggal'] || b['Date'] || '';
   if (!mentah) return '';
-  // Ambil bagian format tanggal YYYY-MM-DD jika formatnya panjang (mis: "Wed, 12 Aug 2026...")
   const str = String(mentah).trim();
-  // Coba parse ke objek Date untuk memastikan apakah ini tanggal yang valid
   const parsed = new Date(str);
   if (!isNaN(parsed.getTime())) {
     const yyyy = parsed.getFullYear();
@@ -511,7 +508,10 @@ async function muatSemuaData() {
     const daftarTanggal = Array.from(tanggalSet).sort((a, b) => new Date(b) - new Date(a));
 
     elPilihTanggal.innerHTML = '<option value="">Semua Tanggal</option>' +
-      daftarTanggal.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+      daftarTanggal.map(t => `<option value="${escapeHtml(t)}"${t === filterTanggal ? ' selected' : ''}>${escapeHtml(t)}</option>`).join('');
+
+    // Jika tanggal default hari ini tidak ada di data, opsi dropdown bisa disesuaikan atau dibiarkan
+    elPilihTanggal.value = filterTanggal;
 
     populateFilterOptions();
     renderSemua();
@@ -862,7 +862,7 @@ function renderTampilanUtama() {
   elStatus.textContent = `${data.length} berita ditampilkan (dari total ${semuaData.length})`;
 
   if (data.length === 0) {
-    elTabelWrap.innerHTML = '<p style="color:#8b949e">Tidak ada data yang cocok.</p>';
+    elTabelWrap.innerHTML = '<p style="color:#8b949e">Tidak ada data untuk tanggal hari ini atau filter yang dipilih.</p>';
     return;
   }
 
