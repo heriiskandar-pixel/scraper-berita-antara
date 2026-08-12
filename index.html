@@ -164,7 +164,7 @@
 
   #status { color: #8b949e; font-size: 13px; margin-bottom: 12px; }
 
-  /* Grid Grafik (4 Horizontal Bar Chart Grid) */
+  /* Grid Grafik */
   .grafik-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -376,7 +376,7 @@
       Tabel
     </button>
     <button id="btn-view-card" title="Tampilan Kartu">
-      <svg viewBox="0 0 16 16"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5ZM9 2.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5ZM1 10.5A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5ZM9 10.5A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5Z"/></svg>
+      <svg viewBox="0 0 16 16"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5ZM9 2.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5ZM1 10.5A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5ZM9 10.5A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a.5.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5Z"/></svg>
       Kartu
     </button>
   </div>
@@ -461,6 +461,23 @@ function getTanggalHariIniFormat() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// Fungsi untuk mengekstrak string tanggal dari berbagai nama kolom yang mungkin ada
+function ambilTanggalBaris(b) {
+  const mentah = b._tanggalFile || b['Tanggal Terbit'] || b['Tanggal'] || b['Date'] || '';
+  if (!mentah) return '';
+  // Ambil bagian format tanggal YYYY-MM-DD jika formatnya panjang (mis: "Wed, 12 Aug 2026...")
+  const str = String(mentah).trim();
+  // Coba parse ke objek Date untuk memastikan apakah ini tanggal yang valid
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    const yyyy = parsed.getFullYear();
+    const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+    const dd = String(parsed.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return str.substring(0, 10);
+}
+
 function escapeHtml(str) {
   return String(str ?? '')
     .replace(/&/g, '&amp;')
@@ -471,7 +488,6 @@ function escapeHtml(str) {
 
 async function muatSemuaData() {
   try {
-    // Memuat data dari satu file JSON terpusat untuk performa yang sangat cepat
     const res = await fetch('data/semua_berita.json?_=' + Date.now());
     if (!res.ok) throw new Error('File data/semua_berita.json tidak ditemukan');
     
@@ -486,24 +502,16 @@ async function muatSemuaData() {
       return;
     }
 
-    // Ambil daftar tanggal unik dari data dan urutkan secara kalender terbaru
     const tanggalSet = new Set();
     semuaData.forEach(b => {
-      const tgl = b._tanggalFile || b['Tanggal'] || '';
-      if (tgl) tanggalSet.add(tgl);
+      const tgl = ambilTanggalBaris(b);
+      if (tgl && tgl !== 'tidak ditemukan') tanggalSet.add(tgl);
     });
 
     const daftarTanggal = Array.from(tanggalSet).sort((a, b) => new Date(b) - new Date(a));
 
     elPilihTanggal.innerHTML = '<option value="">Semua Tanggal</option>' +
       daftarTanggal.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
-
-    // Set nilai default filter tanggal menjadi hari ini jika tersedia
-    const tglHariIni = getTanggalHariIniFormat();
-    if (tanggalSet.has(tglHariIni)) {
-      filterTanggal = tglHariIni;
-      elPilihTanggal.value = tglHariIni;
-    }
 
     populateFilterOptions();
     renderSemua();
@@ -550,7 +558,7 @@ function dataTersaring() {
   const kataKunci = elCari.value.trim().toLowerCase();
   return semuaData.filter(b => {
     if (!cocokPencarian(b, kataKunci)) return false;
-    const tglBaris = b._tanggalFile || b['Tanggal'] || '';
+    const tglBaris = ambilTanggalBaris(b);
     if (filterTanggal && tglBaris !== filterTanggal) return false;
     if (filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
     if (filterSentimen && String(b['Sentimen'] ?? '').trim() !== filterSentimen) return false;
@@ -563,7 +571,7 @@ function dataAbaikanFilter(field) {
   const kataKunci = elCari.value.trim().toLowerCase();
   return semuaData.filter(b => {
     if (!cocokPencarian(b, kataKunci)) return false;
-    const tglBaris = b._tanggalFile || b['Tanggal'] || '';
+    const tglBaris = ambilTanggalBaris(b);
     if (field !== 'tanggal' && filterTanggal && tglBaris !== filterTanggal) return false;
     if (field !== 'kategori' && filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
     if (field !== 'sentimen' && filterSentimen && String(b['Sentimen'] ?? '').trim() !== filterSentimen) return false;
@@ -599,7 +607,7 @@ function renderGrafikPerHari() {
   const data = dataAbaikanFilter('tanggal');
   const hitung = {};
   for (const b of data) {
-    const tgl = b._tanggalFile || b['Tanggal'] || 'Tanpa Tanggal';
+    const tgl = ambilTanggalBaris(b) || 'Tanpa Tanggal';
     hitung[tgl] = (hitung[tgl] || 0) + 1;
   }
   const label = Object.keys(hitung).sort((a, b) => new Date(a) - new Date(b));
@@ -929,7 +937,7 @@ function renderKartu(data) {
     const judul = escapeHtml(baris['Judul'] || 'Tanpa Judul');
     const link = escapeHtml(baris['Link'] || '#');
     const media = escapeHtml(bersihkanNilai(baris['Media']));
-    const tgl = escapeHtml(baris['Tanggal'] || baris._tanggalFile || '');
+    const tgl = escapeHtml(baris['Tanggal Terbit'] || baris['Tanggal'] || baris._tanggalFile || '');
     const gambar = baris['URL Gambar'] ? `<img src="${escapeHtml(baris['URL Gambar'])}" loading="lazy" alt="gambar" onerror="this.style.display='none'">` : '';
     const desc = escapeHtml(baris['Ringkasan'] || baris['Deskripsi'] || baris['Konten'] || '');
     const sentimen = String(baris['Sentimen'] || 'Netral').trim();
@@ -943,14 +951,17 @@ function renderKartu(data) {
         <div>
           ${gambar}
           <div class="card-meta">
-            <span>${media} • ${tgl}</span>
+            <span>${media}</span>
+            <span>${tgl}</span>
           </div>
-          <div class="card-title"><a href="${link}" target="_blank" rel="noopener">${judul}</a></div>
+          <div class="card-title">
+            <a href="${link}" target="_blank" rel="noopener">${judul}</a>
+          </div>
           <div class="card-desc">${desc}</div>
         </div>
         <div class="card-footer">
-          <span class="${kelasBadge}">${sentimen}</span>
-          <a href="${link}" target="_blank" rel="noopener">Baca &rarr;</a>
+          <span class="${kelasBadge}">${escapeHtml(sentimen)}</span>
+          <a href="${link}" target="_blank" rel="noopener" style="font-size: 12px;">Baca Selengkapnya &rarr;</a>
         </div>
       </div>
     `;
@@ -968,22 +979,38 @@ function renderSemua() {
   renderTampilanUtama();
 }
 
-// Event Listeners
-elPilihTanggal.addEventListener('change', (e) => { filterTanggal = e.target.value || null; renderSemua(); });
-elPilihMedia.addEventListener('change', (e) => { filterMedia = e.target.value || null; renderSemua(); });
-elPilihSentimen.addEventListener('change', (e) => { filterSentimen = e.target.value || null; renderSemua(); });
-elPilihKategori.addEventListener('change', (e) => { filterKategori = e.target.value || null; renderSemua(); });
+elPilihTanggal.addEventListener('change', (e) => {
+  filterTanggal = e.target.value || null;
+  renderSemua();
+});
+
+elPilihMedia.addEventListener('change', (e) => {
+  filterMedia = e.target.value || null;
+  renderSemua();
+});
+
+elPilihSentimen.addEventListener('change', (e) => {
+  filterSentimen = e.target.value || null;
+  renderSemua();
+});
+
+elPilihKategori.addEventListener('change', (e) => {
+  filterKategori = e.target.value || null;
+  renderSemua();
+});
 
 elCari.addEventListener('input', () => {
   clearTimeout(timerCari);
-  timerCari = setTimeout(() => { renderSemua(); }, 300);
+  timerCari = setTimeout(() => {
+    renderTampilanUtama();
+  }, 250);
 });
 
 elResetFilter.addEventListener('click', () => {
   filterTanggal = null;
-  filterMedia = null;
-  filterSentimen = null;
   filterKategori = null;
+  filterSentimen = null;
+  filterMedia = null;
   elPilihTanggal.value = '';
   elPilihMedia.value = '';
   elPilihSentimen.value = '';
@@ -1014,14 +1041,17 @@ elBtnExportExcel.addEventListener('click', () => {
     alert('Tidak ada data untuk diekspor.');
     return;
   }
-  const dataBersih = data.map(({ _tanggalFile, ...rest }) => rest);
-  const worksheet = XLSX.utils.json_to_sheet(dataBersih);
+  const worksheetData = data.map(b => {
+    const bersih = { ...b };
+    delete bersih._tanggalFile;
+    return bersih;
+  });
+  const worksheet = XLSX.utils.json_to_sheet(worksheetData);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Analisis Berita");
-  XLSX.writeFile(workbook, "Laporan_Analisis_Berita.xlsx");
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Data Berita');
+  XLSX.writeFile(workbook, `Laporan_Berita_${getTanggalHariIniFormat()}.xlsx`);
 });
 
-// Inisialisasi awal
 muatSemuaData();
 </script>
 </body>
