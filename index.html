@@ -11,7 +11,7 @@
   * { box-sizing: border-box; }
   html, body {
     max-width: 100%;
-    overflow-x: hidden; /* jaring pengaman tambahan supaya halaman tidak melebar horizontal */
+    overflow-x: hidden;
   }
   body {
     font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
@@ -186,10 +186,6 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    /* PENTING: grid/flex item punya min-width:auto secara default, sehingga
-       konten (canvas chart) bisa memaksa kolom grid melebar. min-width:0
-       memaksa kartu ini untuk selalu menyesuaikan lebar kolom yang tersedia,
-       bukan sebaliknya. Ini akar masalah "grafik keluar jalur". */
     min-width: 0;
     overflow: hidden;
   }
@@ -202,9 +198,6 @@
     height: 220px;
     overflow: hidden;
   }
-  /* Untuk grafik dengan jumlah label yang bisa sangat banyak (Media, Kategori),
-     area grafik dibuat bisa discroll secara vertikal supaya batang tidak
-     terkompresi/keluar jalur dari kartu saat jumlah data besar. */
   .chart-container.scrollable {
     overflow-y: auto;
     overflow-x: hidden;
@@ -313,7 +306,7 @@
     </div>
   </div>
 
-  <!-- Ringkasan KPI Cards (Jumlah Berita, Jumlah Media, Jumlah Kategori) -->
+  <!-- Ringkasan KPI Cards -->
   <div class="kpi-grid">
     <div class="kpi-card">
       <div class="kpi-title">Jumlah Berita</div>
@@ -332,7 +325,7 @@
     </div>
   </div>
 
-  <!-- Grid Grafik (Semua dalam bentuk horizontal bar chart) -->
+  <!-- Grid Grafik -->
   <div class="grafik-grid">
     <div class="kartu-grafik">
       <h2>Jumlah Berita / Hari</h2>
@@ -366,27 +359,17 @@
 </div>
 
 <div class="kontrol">
-  <!-- Filter Tanggal -->
   <select id="pilih-tanggal"><option value="">Semua Tanggal</option></select>
-  
-  <!-- Filter Media -->
   <select id="pilih-media"><option value="">Semua Media</option></select>
-
-  <!-- Filter Sentimen -->
   <select id="pilih-sentimen">
     <option value="">Semua Sentimen</option>
     <option value="Positif">Positif</option>
     <option value="Netral">Netral</option>
     <option value="Negatif">Negatif</option>
   </select>
-
-  <!-- Filter Kategori -->
   <select id="pilih-kategori"><option value="">Semua Kategori</option></select>
-
-  <!-- Pencarian Bebas -->
   <input type="text" id="cari" placeholder="Cari kata kunci...">
 
-  <!-- Switch Mode View -->
   <div class="group-view">
     <button id="btn-view-table" class="aktif" title="Tampilan Tabel">
       <svg viewBox="0 0 16 16"><path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v2.5h13v-2.5a.25.25 0 0 0-.25-.25Zm13 4h-13v3h13Zm0 4.5h-13v3.75c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25Z"/></svg>
@@ -399,8 +382,6 @@
   </div>
 
   <button id="reset-filter">Reset Filter</button>
-  
-  <!-- Tombol Ekspor Excel dengan Ikon Theme -->
   <button id="btn-export-excel" class="btn-export-excel">
     <svg viewBox="0 0 16 16"><path d="M2.75 1A1.75 1.75 0 0 0 1 2.75v10.5C1 14.216 1.784 15 2.75 15h10.5A1.75 1.75 0 0 0 15 13.25V2.75A1.75 1.75 0 0 0 13.25 1H2.75ZM2 2.75a.25.25 0 0 1 .25-.25h10.5a.25.25 0 0 1 .25.25v2H2v-2Zm0 3.5h11v3.5H2v-3.5Zm0 4.5h11v3.25a.25.25 0 0 1-.25.25H2.75a.25.25 0 0 1-.25-.25V10.75Zm2.5-7.25h2v1.5h-2V3.5Zm0 4.5h2v1.5h-2V8Zm0 4.5h2v1.5h-2V12.5Z"/></svg>
     Ekspor Excel
@@ -443,38 +424,26 @@ const elBtnExportExcel = document.getElementById('btn-export-excel');
 const btnViewTable = document.getElementById('btn-view-table');
 const btnViewCard = document.getElementById('btn-view-card');
 
-const WARNA_NORMAL = '#30363d';
-const WARNA_AKTIF = '#58a6ff';
-const WARNA_SENTIMEN = { 'Positif': '#238636', 'Negatif': '#da3633', 'Netral': '#8b949e' };
-
-// Palet gradasi per-grafik, mengikuti aksen warna tema gelap (GitHub dark style)
 const TEMA_GRADASI = {
-  hari:            { mulai: '#1f6feb', akhir: '#79c0ff' }, // biru
-  kategori:        { mulai: '#6e40c9', akhir: '#c297ff' }, // ungu
-  media:           { mulai: '#9a6700', akhir: '#f2cc60' }, // kuning/emas
-  sentimenPositif: { mulai: '#196c2e', akhir: '#56d364' }, // hijau
-  sentimenNegatif: { mulai: '#8e1519', akhir: '#ff7b72' }, // merah
-  sentimenNetral:  { mulai: '#484f58', akhir: '#c9d1d9' }  // abu-abu
+  hari:            { mulai: '#1f6feb', akhir: '#79c0ff' },
+  kategori:        { mulai: '#6e40c9', akhir: '#c297ff' },
+  media:           { mulai: '#9a6700', akhir: '#f2cc60' },
+  sentimenPositif: { mulai: '#196c2e', akhir: '#56d364' },
+  sentimenNegatif: { mulai: '#8e1519', akhir: '#ff7b72' },
+  sentimenNetral:  { mulai: '#484f58', akhir: '#c9d1d9' }
 };
-const WARNA_REDUP = 'rgba(110,118,129,0.25)'; // warna batang yang tidak terpilih saat ada filter aktif
+const WARNA_REDUP = 'rgba(110,118,129,0.25)';
 
-// Membuat gradasi horizontal (kiri->kanan) menyesuaikan area chart yang sebenarnya.
-// Chart.js baru punya chartArea setelah layout pertama, jadi fungsi ini dipakai
-// sebagai "scriptable option" yang dievaluasi ulang tiap render/resize.
 function buatGradientHorizontal(ctx, chartArea, warnaMulai, warnaAkhir) {
-  if (!chartArea) return warnaAkhir; // fallback sebelum chartArea siap
+  if (!chartArea) return warnaAkhir;
   const gradient = ctx.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
   gradient.addColorStop(0, warnaMulai);
   gradient.addColorStop(1, warnaAkhir);
   return gradient;
 }
 
-// Format Tanggal Ke: d mmm yyyy, hh:mm:ss
 function formatTanggalIndo(dateObj) {
-  const bulanIndo = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-    'Jul', 'Agust', 'Sep', 'Okt', 'Nov', 'Des'
-  ];
+  const bulanIndo = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agust', 'Sep', 'Okt', 'Nov', 'Des'];
   const d = dateObj.getDate();
   const mmm = bulanIndo[dateObj.getMonth()];
   const yyyy = dateObj.getFullYear();
@@ -484,7 +453,15 @@ function formatTanggalIndo(dateObj) {
   return `${d} ${mmm} ${yyyy}, ${hh}:${mm}:${ss}`;
 }
 
-// Sanitasi XSS & Utility
+// Mendapatkan format tanggal hari ini misal: "2026-06-06" (sesuaikan dengan format string tanggal pada file data/index.json Anda)
+function getTanggalHariIniFormat() {
+  const sekarang = new Date();
+  const yyyy = sekarang.getFullYear();
+  const mm = String(sekarang.getMonth() + 1).padStart(2, '0');
+  const dd = String(sekarang.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 function escapeHtml(str) {
   return String(str ?? '')
     .replace(/&/g, '&amp;')
@@ -492,8 +469,6 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
-
-// ---------- MUAT DATA ----------
 
 async function muatSemuaData() {
   try {
@@ -511,8 +486,20 @@ async function muatSemuaData() {
       return;
     }
 
+    // Sort daftar tanggal sesuai urutan kalender terbaru (Descending: dari tanggal terbaru ke terlama. Ubah ke `<` jika ingin dari terlama ke terbaru)
+    daftar.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+
     elPilihTanggal.innerHTML = '<option value="">Semua Tanggal</option>' +
       daftar.map(d => `<option value="${escapeHtml(d.tanggal)}">${escapeHtml(d.tanggal)}</option>`).join('');
+
+    // Set nilai default filter tanggal menjadi hari ini (jika tanggal hari ini ada di dalam list data)
+    const tglHariIni = getTanggalHariIniFormat();
+    const isAdaHariIni = daftar.some(d => d.tanggal === tglHariIni);
+    
+    if (isAdaHariIni) {
+      filterTanggal = tglHariIni;
+      elPilihTanggal.value = tglHariIni;
+    }
 
     elStatus.textContent = `Memuat ${daftar.length} file...`;
 
@@ -554,8 +541,6 @@ function populateFilterOptions() {
   elPilihKategori.innerHTML = '<option value="">Semua Kategori</option>' +
     Array.from(kategoriSet).sort().map(k => `<option value="${escapeHtml(k)}">${escapeHtml(k)}</option>`).join('');
 }
-
-// ---------- FUNGSI FILTER & UTILITY ----------
 
 function bersihkanNilai(val) {
   if (!val || String(val).trim() === '' || String(val).toLowerCase() === 'undefined') {
@@ -599,8 +584,6 @@ function dataAbaikanFilter(field) {
   });
 }
 
-// ---------- RENDER KPI CARDS ----------
-
 function renderKPICards(data) {
   const totalTampil = data.length;
   const totalKeseluruhan = semuaData.length;
@@ -624,15 +607,14 @@ function renderKPICards(data) {
   document.getElementById('kpi-kategori-sub').textContent = `Kategori topik unik`;
 }
 
-// ---------- RENDER GRAFIK (BAR HORIZONTAL & MENAMPILKAN SEMUA DATA) ----------
-
 function renderGrafikPerHari() {
   const data = dataAbaikanFilter('tanggal');
   const hitung = {};
   for (const b of data) {
     hitung[b._tanggalFile] = (hitung[b._tanggalFile] || 0) + 1;
   }
-  const label = Object.keys(hitung).sort();
+  // Urutkan label tanggal secara kalender terbaru (ascending untuk sumbu Y chart)
+  const label = Object.keys(hitung).sort((a, b) => new Date(a) - new Date(b));
   const nilai = label.map(l => hitung[l]);
 
   const ctx = document.getElementById('grafik-per-hari');
@@ -748,14 +730,11 @@ function renderGrafikKategori() {
     }
   }
 
-  // Tampilkan SEMUA data kategori tanpa dipotong slice
   const sortedKat = Object.entries(hitung).sort((a, b) => b[1] - a[1]);
   const label = sortedKat.map(item => item[0]);
   const nilai = sortedKat.map(item => item[1]);
 
   const ctx = document.getElementById('grafik-kategori');
-  // Tinggi canvas menyesuaikan jumlah label (minimal 24px per batang)
-  // supaya batang tidak terkompresi/tumpang tindih atau keluar jalur dari kartu.
   const tinggiKategori = Math.max(220, label.length * 24);
   ctx.parentElement.style.height = tinggiKategori + 'px';
   if (chartKategori) chartKategori.destroy();
@@ -805,14 +784,11 @@ function renderGrafikMedia() {
     hitung[m] = (hitung[m] || 0) + 1;
   }
 
-  // Tampilkan SEMUA data media
   const sortedMedia = Object.entries(hitung).sort((a, b) => b[1] - a[1]);
   const label = sortedMedia.map(item => item[0]);
   const nilai = sortedMedia.map(item => item[1]);
 
   const ctx = document.getElementById('grafik-media');
-  // Tinggi canvas menyesuaikan jumlah label (minimal 24px per batang)
-  // supaya batang tidak terkompresi/tumpang tindih atau keluar jalur dari kartu.
   const tinggiMedia = Math.max(220, label.length * 24);
   ctx.parentElement.style.height = tinggiMedia + 'px';
   if (chartMedia) chartMedia.destroy();
@@ -853,8 +829,6 @@ function renderGrafikMedia() {
   });
 }
 
-// ---------- CHIP FILTER ----------
-
 function renderChipFilter() {
   const chip = [];
   if (filterTanggal) {
@@ -876,8 +850,6 @@ function hapusFilterTanggal() { filterTanggal = null; elPilihTanggal.value = '';
 function hapusFilterMedia() { filterMedia = null; elPilihMedia.value = ''; renderSemua(); }
 function hapusFilterSentimen() { filterSentimen = null; elPilihSentimen.value = ''; renderSemua(); }
 function hapusFilterKategori() { filterKategori = null; elPilihKategori.value = ''; renderSemua(); }
-
-// ---------- RENDER TAMPILAN UTAMA ----------
 
 function renderTampilanUtama() {
   let data = dataTersaring();
@@ -905,7 +877,6 @@ function renderTampilanUtama() {
   }
 }
 
-// Render Tabel
 function renderTabel(data) {
   const kolom = Object.keys(semuaData[0]).filter(k => k !== '_tanggalFile' && k !== 'Link');
 
@@ -933,14 +904,15 @@ function renderTabel(data) {
           html += `<td>${escapeHtml(valPenulis)}</td>`;
         }
       } else if (k === 'URL Gambar' && nilai) {
-        html += `<td><a href="${linkBerita}" target="_blank" rel="noopener"><img src="${escapeHtml(nilai)}" loading="lazy" alt="gambar" onerror="this.onerror=null; this.src='https://via.placeholder.com/300x160?text=No+Image';"></a></td>`;
+        html += `<td><a href="${linkBerita}" target="_blank" rel="noopener"><img src="${escapeHtml(nilai)}" loading="lazy" alt="gambar" onerror="this.style.display='none'"></a></td>`;
       } else if (k === 'Sentimen') {
-        let cls = 'badge-net';
-        if (nilai === 'Positif') cls = 'badge-pos';
-        else if (nilai === 'Negatif') cls = 'badge-neg';
-        html += `<td><span class="${cls}">${escapeHtml(nilai)}</span></td>`;
+        const s = String(nilai).trim();
+        let kelasBadge = 'badge-net';
+        if (s === 'Positif') kelasBadge = 'badge-pos';
+        else if (s === 'Negatif') kelasBadge = 'badge-neg';
+        html += `<td><span class="${kelasBadge}">${escapeHtml(s || 'Netral')}</span></td>`;
       } else {
-        html += `<td>${escapeHtml(String(nilai ?? ''))}</td>`;
+        html += `<td>${escapeHtml(nilai)}</td>`;
       }
     }
     html += '</tr>';
@@ -950,7 +922,7 @@ function renderTabel(data) {
 
   elTabelWrap.querySelectorAll('th').forEach(th => {
     th.addEventListener('click', () => {
-      const k = th.dataset.kolom;
+      const k = th.getAttribute('data-kolom');
       if (kolomUrut === k) {
         arahUrut *= -1;
       } else {
@@ -962,43 +934,34 @@ function renderTabel(data) {
   });
 }
 
-// Render Kartu (Card View)
 function renderKartu(data) {
   let html = '<div class="card-grid">';
-
   for (const baris of data) {
     const judul = escapeHtml(baris['Judul'] || 'Tanpa Judul');
-    const media = escapeHtml(bersihkanNilai(baris['Media']));
-    const penulis = escapeHtml(bersihkanNilai(baris['Penulis'] || baris['Author']));
-    const tanggal = escapeHtml(baris['Tanggal'] || baris._tanggalFile || '');
-    const gambar = escapeHtml(baris['URL Gambar'] || '');
-    const ringkasan = escapeHtml(baris['Ringkasan'] || baris['Isi'] || '');
-    const sentimen = baris['Sentimen'] || 'Netral';
     const link = escapeHtml(baris['Link'] || '#');
-
-    let cls = 'badge-net';
-    if (sentimen === 'Positif') cls = 'badge-pos';
-    else if (sentimen === 'Negatif') cls = 'badge-neg';
+    const media = escapeHtml(bersihkanNilai(baris['Media']));
+    const tgl = escapeHtml(baris['Tanggal'] || baris._tanggalFile || '');
+    const gambar = baris['URL Gambar'] ? `<img src="${escapeHtml(baris['URL Gambar'])}" loading="lazy" alt="gambar" onerror="this.style.display='none'">` : '';
+    const desc = escapeHtml(baris['Ringkasan'] || baris['Deskripsi'] || baris['Konten'] || '');
+    const sentimen = String(baris['Sentimen'] || 'Netral').trim();
+    
+    let kelasBadge = 'badge-net';
+    if (sentimen === 'Positif') kelasBadge = 'badge-pos';
+    else if (sentimen === 'Negatif') kelasBadge = 'badge-neg';
 
     html += `
       <div class="news-card">
         <div>
-          ${gambar ? `<a href="${link}" target="_blank" rel="noopener"><img src="${gambar}" loading="lazy" alt="gambar" onerror="this.onerror=null; this.src='https://via.placeholder.com/300x160?text=No+Image';"></a>` : ''}
+          ${gambar}
           <div class="card-meta">
-            <span><strong>${media}</strong> • ${tanggal}</span>
-            <span class="${cls}">${escapeHtml(sentimen)}</span>
+            <span>${media} • ${tgl}</span>
           </div>
-          <div class="card-title">
-            <a href="${link}" target="_blank" rel="noopener">${judul}</a>
-          </div>
-          <div style="font-size:11px; color:#8b949e; margin-bottom:8px;">
-            Penulis: ${penulis === 'tidak ditemukan' ? '<span class="tidak-ditemukan">tidak ditemukan</span>' : penulis}
-          </div>
-          ${ringkasan ? `<div class="card-desc">${ringkasan}</div>` : ''}
+          <div class="card-title"><a href="${link}" target="_blank" rel="noopener">${judul}</a></div>
+          <div class="card-desc">${desc}</div>
         </div>
         <div class="card-footer">
-          <span style="font-size:11px; color:#8b949e;">${escapeHtml(baris['Kategori'] || '')}</span>
-          <a href="${link}" target="_blank" rel="noopener" style="font-weight:600; font-size:12px;">Baca Selengkapnya →</a>
+          <span class="${kelasBadge}">${sentimen}</span>
+          <a href="${link}" target="_blank" rel="noopener">Baca &rarr;</a>
         </div>
       </div>
     `;
@@ -1007,65 +970,24 @@ function renderKartu(data) {
   elTabelWrap.innerHTML = html;
 }
 
-// ---------- EKSPOR DATA ----------
-
-function eksporKeExcel() {
-  const data = dataTersaring();
-  if (data.length === 0) {
-    alert('Tidak ada data yang dapat diekspor.');
-    return;
-  }
-
-  const dataEkspor = data.map(item => {
-    const copy = { ...item };
-    delete copy._tanggalFile;
-    return copy;
-  });
-
-  const ws = XLSX.utils.json_to_sheet(dataEkspor);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Data Berita");
-  
-  const dateStr = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `Laporan_Berita_Tersaring_${dateStr}.xlsx`);
-}
-
-// ---------- EVENT HANDLERS & INITIALIZATION ----------
-
 function renderSemua() {
+  renderChipFilter();
   renderGrafikPerHari();
   renderGrafikSentimen();
   renderGrafikKategori();
   renderGrafikMedia();
-  renderChipFilter();
   renderTampilanUtama();
 }
 
-elPilihTanggal.addEventListener('change', (e) => {
-  filterTanggal = e.target.value || null;
-  renderSemua();
-});
-
-elPilihMedia.addEventListener('change', (e) => {
-  filterMedia = e.target.value || null;
-  renderSemua();
-});
-
-elPilihSentimen.addEventListener('change', (e) => {
-  filterSentimen = e.target.value || null;
-  renderSemua();
-});
-
-elPilihKategori.addEventListener('change', (e) => {
-  filterKategori = e.target.value || null;
-  renderSemua();
-});
+// Event Listeners
+elPilihTanggal.addEventListener('change', (e) => { filterTanggal = e.target.value || null; renderSemua(); });
+elPilihMedia.addEventListener('change', (e) => { filterMedia = e.target.value || null; renderSemua(); });
+elPilihSentimen.addEventListener('change', (e) => { filterSentimen = e.target.value || null; renderSemua(); });
+elPilihKategori.addEventListener('change', (e) => { filterKategori = e.target.value || null; renderSemua(); });
 
 elCari.addEventListener('input', () => {
   clearTimeout(timerCari);
-  timerCari = setTimeout(() => {
-    renderSemua();
-  }, 300);
+  timerCari = setTimeout(() => { renderSemua(); }, 300);
 });
 
 elResetFilter.addEventListener('click', () => {
@@ -1073,13 +995,13 @@ elResetFilter.addEventListener('click', () => {
   filterMedia = null;
   filterSentimen = null;
   filterKategori = null;
-  elCari.value = '';
-  
   elPilihTanggal.value = '';
   elPilihMedia.value = '';
   elPilihSentimen.value = '';
   elPilihKategori.value = '';
-
+  elCari.value = '';
+  kolomUrut = null;
+  arahUrut = 1;
   renderSemua();
 });
 
@@ -1097,11 +1019,21 @@ btnViewCard.addEventListener('click', () => {
   renderTampilanUtama();
 });
 
-elBtnExportExcel.addEventListener('click', eksporKeExcel);
+elBtnExportExcel.addEventListener('click', () => {
+  const data = dataTersaring();
+  if (data.length === 0) {
+    alert('Tidak ada data untuk diekspor.');
+    return;
+  }
+  const dataBersih = data.map(({ _tanggalFile, ...rest }) => rest);
+  const worksheet = XLSX.utils.json_to_sheet(dataBersih);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Analisis Berita");
+  XLSX.writeFile(workbook, "Laporan_Analisis_Berita.xlsx");
+});
 
-// Jalankan Muat Data saat Dokumen Siap
-document.addEventListener('DOMContentLoaded', muatSemuaData);
+// Inisialisasi awal
+muatSemuaData();
 </script>
-
 </body>
 </html>
