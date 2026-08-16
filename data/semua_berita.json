@@ -72182,7 +72182,7 @@
     "Media": "Antara"
   },
   {
-    "Kategori": "Terkini",
+    "Kategori": "Top News",
     "Judul": "Kemenkes targetkan RSUD terdampak gempa NTT pulih dalam sepekan",
     "Tanggal Terbit": "Sun, 16 Aug 2026 10:28:11 +0700",
     "Penulis": "antaranews.com",
@@ -72215,7 +72215,7 @@
     "Media": "Antara"
   },
   {
-    "Kategori": "Terkini",
+    "Kategori": "Top News",
     "Judul": "940 personel Satpol PP bersiaga kawal kirab hingga karnaval HUT RI",
     "Tanggal Terbit": "Sun, 16 Aug 2026 10:16:05 +0700",
     "Penulis": "antaranews.com",
@@ -72292,7 +72292,7 @@
     "Media": "Antara"
   },
   {
-    "Kategori": "Terkini",
+    "Kategori": "Top News",
     "Judul": "Operasi SAR difokuskan pada 2 kabupaten di Flores pascagempa Nagekeo",
     "Tanggal Terbit": "Sun, 16 Aug 2026 09:51:39 +0700",
     "Penulis": "antaranews.com",
@@ -72369,7 +72369,7 @@
     "Media": "Antara"
   },
   {
-    "Kategori": "Terkini",
+    "Kategori": "Top News",
     "Judul": "Iran dan Oman capai kesepakatan soal Selat Hormuz",
     "Tanggal Terbit": "Sun, 16 Aug 2026 09:18:33 +0700",
     "Penulis": "antaranews.com",
@@ -73231,7 +73231,7 @@
     "Judul": "Truk Nyangkut di JPO Kramat Jati, Pramono Siapkan Sanksi ke Operator",
     "Tanggal Terbit": "Sun, 16 Aug 2026 11:11:49 +0700",
     "Penulis": "Devi Puspitasari",
-    "Ringkasan": "Pramono mengatakan tidak akan pandang bulu jika ditemukan adanya pelanggaran yang dilakukan pihak operatur truk.",
+    "Ringkasan": "Pramono mengatakan tidak akan pandang bulu jika ditemukan adanya pelanggaran yang dilakukan pihak operator truk.",
     "Sentimen": "Netral",
     "Link": "https://news.detik.com/berita/d-8620845/truk-nyangkut-di-jpo-kramat-jati-pramono-siapkan-sanksi-ke-operator",
     "URL Gambar": "https://akcdn.detik.net.id/community/media/visual/2026/08/13/gubernur-dki-jakarta-pramono-anung-1786605339456_169.jpeg?w=360&q=90",
@@ -74610,6 +74610,391 @@
     "Sentimen": "Netral",
     "Link": "https://money.kompas.com/read/2026/08/16/101000726/paradoks-desil--saat-masyarakat-miskin-dianggap-sejahtera",
     "URL Gambar": "https://asset.kompas.com/crops/EUxS9q2eIi6pSi7toZimZ66G5mU=/0x0:6000x4000/1200x675/filters:watermark(data/photo/2026/01/30/697c815e7ef28.png,0,-0,1)/data/photo/2026/08/16/6a80f89e501ef.jpg",
+    "Media": "Kompas"
+  },
+  {
+    "Kategori": "Top News",
+    "Judul": "Cegah disinformasi, BNPB aktifkan Media Center penanganan gempa NTT",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:35:22 +0700",
+    "Penulis": "antaranews.com",
+    "Ringkasan": "Badan Nasional Penanggulangan Bencana (BNPB) mengaktifkan Media Center resmi guna menyajikan pembaruan data penanganan ...",
+    "Sentimen": "Netral",
+    "Link": "https://www.antaranews.com/berita/5696937/cegah-disinformasi-bnpb-aktifkan-media-center-penanganan-gempa-ntt",
+    "URL Gambar": "https://cdn.antaranews.com/cache/800x533/2026/08/15/pengungsi-korban-bencana-gempa-bumi-di-ntt-2842148.jpeg",
+    "Media": "Antara"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Catat! TransJ Modifikasi Sejumlah Rute Saat HUT Ke-81 RI, Ini Daftarnya",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:55:47 +0700",
+    "Penulis": "Adrial akbar",
+    "Ringkasan": "Transjakarta memberlakukan sejumlah modifikasi layanan saat HUT ke-81 RI pada 17 Agustus besok. Pemberlakuan modifikasi ini diberlakukan pada sejumlah rute.",
+    "Sentimen": "Netral",
+    "Link": "https://news.detik.com/berita/d-8620884/catat-transj-modifikasi-sejumlah-rute-saat-hut-ke-81-ri-ini-daftarnya",
+    "URL Gambar": "https://akcdn.detik.net.id/community/media/visual/2025/04/29/ilustrasi-transjakarta-1745903314872_169.jpeg?w=360&q=90",
+    "Media": "Detik"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Seskab: Pemerintah Kirim 27 Ton Logistik Bantu Penanganan Gempa NTT",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:39:22 +0700",
+    "Penulis": "Dwi Rahmawati",
+    "Ringkasan": "Pemerintah mengirimkan 27 ton logistik ke NTT pascagempa M 7. TNI-Polri dikerahkan untuk perbantuan.",
+    "Sentimen": "Netral",
+    "Link": "https://news.detik.com/berita/d-8620869/seskab-pemerintah-kirim-27-ton-logistik-bantu-penanganan-gempa-ntt",
+    "URL Gambar": "https://akcdn.detik.net.id/community/media/visual/2026/08/16/pemerintah-1786855087497_169.jpeg?w=360&q=90",
+    "Media": "Detik"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Taman Anak Sejahtera Wong Kito Hadirkan Layanan Pengasuhan Anak Gratis",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:34:46 +0700",
+    "Penulis": "Hana Nushratu Uzma",
+    "Ringkasan": "Sebanyak 140 anak PAUD dan TK meramaikan peresmian Taman Anak Sejahtera Wong Kito di Palembang. Fasilitas ini mendukung pengasuhan berkualitas dan gratis.",
+    "Sentimen": "Netral",
+    "Link": "https://news.detik.com/berita/d-8620866/taman-anak-sejahtera-wong-kito-hadirkan-layanan-pengasuhan-anak-gratis",
+    "URL Gambar": "https://akcdn.detik.net.id/community/media/visual/2026/08/16/kemensos-1786854856494_169.jpeg?w=360&q=90",
+    "Media": "Detik"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "BNPB Dorong 6 Daerah Segera Tetapkan Status Darurat Usai Gempa NTT",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:33:20 +0700",
+    "Penulis": "Arief Ikhsanudin",
+    "Ringkasan": "Kepala BNPB Suharyanto meminta status darurat untuk daerah terdampak gempa M7 di NTT. Ini penting untuk dukungan penanganan bencana dari pemerintah pusat.",
+    "Sentimen": "Netral",
+    "Link": "https://news.detik.com/berita/d-8620865/bnpb-dorong-6-daerah-segera-tetapkan-status-darurat-usai-gempa-ntt",
+    "URL Gambar": "https://akcdn.detik.net.id/community/media/visual/2026/08/16/kepala-badan-nasional-penanggulangan-bencana-bnpb-letjen-tni-suharyanto-1786854718754_169.jpeg?w=360&q=90",
+    "Media": "Detik"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "F-PKB MPR Kawal Investasi agar Manfaatnya Dirasakan Rakyat",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:29:42 +0700",
+    "Penulis": "Fara Difa Alfeni",
+    "Ringkasan": "Fraksi PKB MPR nilai pidato Prabowo menekankan kesejahteraan rakyat. Mereka mendukung pertumbuhan ekonomi dan pengelolaan kekayaan alam untuk manfaat masyarakat",
+    "Sentimen": "Netral",
+    "Link": "https://news.detik.com/berita/d-8620862/f-pkb-mpr-kawal-investasi-agar-manfaatnya-dirasakan-rakyat",
+    "URL Gambar": "https://akcdn.detik.net.id/community/media/visual/2025/08/05/ketua-fraksi-pkb-mpr-ri-neng-eem-marhamah-zulfa-hiz-1754371453500_169.jpeg?w=360&q=90",
+    "Media": "Detik"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "BULOG Gerak Cepat Salurkan Bantuan untuk Warga Terdampak di NTT",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 10:44:53 +0700",
+    "Penulis": "Chayyara Zulghifary",
+    "Ringkasan": "Pemerintah melalui BULOG menyalurkan bantuan beras dan minyak goreng untuk masyarakat terdampak gempa di NTT. Bantuan disalurkan secara bertahap dan cepat.",
+    "Sentimen": "Netral",
+    "Link": "https://news.detik.com/berita/d-8620802/bulog-gerak-cepat-salurkan-bantuan-untuk-warga-terdampak-di-ntt",
+    "URL Gambar": "https://akcdn.detik.net.id/community/media/visual/2026/08/16/bulog-1786851558420_169.jpeg?w=360&q=90",
+    "Media": "Detik"
+  },
+  {
+    "Kategori": "Hot",
+    "Judul": "Antusias Kris Dayanti Jelang Nyanyi di Istana Negara saat 17 Agustus",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:10:09 +0700",
+    "Penulis": "wes",
+    "Ringkasan": "Kris Dayanti menjadi salah satu penyanyi yang bakal tampil di Istana Negara.",
+    "Sentimen": "Netral",
+    "Link": "https://hot.detik.com/celeb/d-8620646/antusias-kris-dayanti-jelang-nyanyi-di-istana-negara-saat-17-agustus",
+    "URL Gambar": "https://akcdn.detik.net.id/community/media/visual/2026/08/16/kris-dayanti-1786843781879_169.jpeg?w=360&q=90",
+    "Media": "Detik"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Sekolah Kedinasan Poltekpin 2026 Buka Pendaftaran, Ada 250 Formasi, Cek Syarat dan Cara Daftarnya",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 12:15:24 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Poltekpin membuka 250 formasi mahasiswa baru 2026 bagi lulusan SMA/sederajat dengan empat pilihan program studi di Jurusan Hukum Terapan.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/pendidikan/7869257/sekolah-kedinasan-poltekpin-2026-buka-pendaftaran-ada-250-formasi-cek-syarat-dan-cara-daftarnya",
+    "URL Gambar": "https://asset.tribunnews.com/jmwxKWMbAmosdFAQ1tTGsn_5I7g=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/Sekolah-Kedinasan-Poltekpin-2026-Buka-Pendaftaran.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Saksi Ungkap Detik-detik Pengendara Motor Diduga Lempar Bom Molotov di 2 Pos Polisi Wilayah Surabaya",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 12:14:10 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Dua Pos Polisi Lalu Lintas (Polantas) di Jalan A Yani, Kota Surabaya dilempari benda diduga bom molotov pada Sabtu (15/8/2026) malam.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/regional/7869256/saksi-ungkap-detik-detik-pengendara-motor-diduga-lempar-bom-molotov-di-2-pos-polisi-wilayah-surabaya",
+    "URL Gambar": "https://asset.tribunnews.com/F-OzIkcqR1ylAK7uL3O-3j9P3FU=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/Kolase-Pos-Polisi-di-Surabaya-Bom-Molotov.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Hasil Renovasi Venue Kejuaraan Dunia BWF 2026 Tuai Pujian dari Li Shi Feng dan Wang Zhi Yi",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 12:13:44 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Renovasi Indira Gandhi Indoor Stadium yang menjadi venue Kejuaraan Dunia BWF 2026 mendapat pujian dari Li Shi Feng dan Wang Zhi Yi.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/sport/7869255/hasil-renovasi-venue-kejuaraan-dunia-bwf-2026-tuai-pujian-dari-li-shi-feng-dan-wang-zhi-yi",
+    "URL Gambar": "https://asset.tribunnews.com/FgwYgkArmup5TF2bGeE7msCwU-s=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/Wang-Zhi-Yi-Gagal-Raih-Gelar-Juara-Indonesia-Open-2025_20250609_070424.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Ketua DPD Minta Pemerintah Beri Dukungan Anggaran untuk Daerah Terdampak Gempa di NTT",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 12:06:42 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Ketua DPD RI meminta pemerintah pusat memberikan dukungan anggaran (fiskal) untuk pemerintah daerah yang terdampak gempa bumi di Flores, NTT.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/nasional/7869254/ketua-dpd-minta-pemerintah-beri-dukungan-anggaran-untuk-daerah-terdampak-gempa-di-ntt",
+    "URL Gambar": "https://asset.tribunnews.com/QlzbSaX4p1FEVktGSt_NhVYx-YY=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/Ketua-DPD-RI-Sultan-Baktiar-Najamudin-bicara.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Jazzy Pearl Bastian Putrinya Mulai Remaja, Vino G Bastian Ungkap Rasa Khawatirnya",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 12:05:27 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Vino G Bastian mulai merasakan kekhawatiran sebagai seorang ayah seiring putrinya, Jizzy Pearl Bastian, beranjak remaja.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/seleb/7869253/jazzy-pearl-bastian-putrinya-mulai-remaja-vino-g-bastian-ungkap-rasa-khawatirnya",
+    "URL Gambar": "https://asset.tribunnews.com/wayiMhyIGr1gPYU5YQUSBeLDuJo=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/Vino-G-Bastian-ungkap-rasa-bangga-melihat-putrinya-juara-olimpiade-matematika-di-Singapura.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Dilaporkan Fangfang Istri Sirinya, Vicky Prasetyo Bantah Telantarkan Anak, Siap Diperiksa Polisi",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 12:03:34 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Vicky Prasetyo menjawab tudingan penelantaran anak yang telah dilaporkan Fangfang istri sirinya.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/seleb/7869252/dilaporkan-fangfang-istri-sirinya-vicky-prasetyo-bantah-telantarkan-anak-siap-diperiksa-polisi",
+    "URL Gambar": "https://asset.tribunnews.com/g6lqCSM4_j3wyFBplhMLDdyEApo=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/Vicky-Prasetyo-ewrtyu78io.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Empat Pertimbangan Kendaraan Harus Ditowing untuk Cegah Risiko Lebih Parah",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 12:02:44 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Menghadapi kondisi jalan macet berjam-jam berisiko membuat mesin mobil mengalami overheating.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/otomotif/7869251/empat-pertimbangan-kendaraan-harus-ditowing-untuk-cegah-risiko-lebih-parah",
+    "URL Gambar": "https://asset.tribunnews.com/tWWQg0CuL9iPdtpP3tTRUlDA8GE=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/Towing-kendaraan-OK.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Bongky BIP Bikin Anthem untuk TPAAF, Perkuat Jalur Pelajar SMA ke Eropa",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 12:01:56 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Bongky Marcel ciptakan Putih Abu-Abu Is The Best sebagai anthem TPAAF 2026, menyemangati pelajar di 20 kota.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/seleb/7869250/bongky-bip-bikin-anthem-untuk-tpaaf-perkuat-jalur-pelajar-sma-ke-eropa",
+    "URL Gambar": "https://asset.tribunnews.com/ththlC42lVYVby745Yvc0RWAx7A=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/Bongky-Marcel-lagu-TPAAF.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Gempa di NTT, PB IDI Minta Evakuasi dan Rujukan Pasien Dipercepat",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 12:01:17 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "PB IDI mendorong percepatan layanan kesehatan bagi masyarakat terdampak, terutama di wilayah yang fasilitas kesehatannya mengalami kerusakan.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/nasional/7869249/gempa-di-ntt-pb-idi-minta-evakuasi-dan-rujukan-pasien-dipercepat",
+    "URL Gambar": "https://asset.tribunnews.com/iT6Mh9sPU24f7xNPAub7ydYRZms=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/dampak-gempa-ntt-puskesmas-hancur.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Polri Kerahkan 10 Anjing K-9, Bantu Cari Korban di 3 Kabupaten Paling Terdampak Gempa NTT",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:53:23 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Sejumlah bantuan diterbangkan ke daerah Labuan Bajo, salah satunya 21 anggota Ditpolsatwa Korsabhara Baharkam Polri beserta 10 anjing k-9.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/nasional/7869248/polri-kerahkan-10-anjing-k-9-bantu-cari-korban-di-3-kabupaten-paling-terdampak-gempa-ntt",
+    "URL Gambar": "https://asset.tribunnews.com/05u5tzqz1--z-3TGvVEatBC4hyw=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/Polri-Kirim-K-9-ke-NTT-Gempa.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "14 Fasilitas Kesehatan di Kabupaten Ngada Terdampak Gempa NTT,  Puskesmas Butuh Tenda Darurat",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:48:51 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Gempa bumi di NTT turut berdampak pada sektor kesehatan di Kabupaten Ngada. 14 fasilitas kesehatan terdampak, salah satunya Puskesmas.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/regional/7869247/14-fasilitas-kesehatan-di-kabupaten-ngada-terdampak-gempa-ntt-puskesmas-butuh-tenda-darurat",
+    "URL Gambar": "https://asset.tribunnews.com/iT6Mh9sPU24f7xNPAub7ydYRZms=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/dampak-gempa-ntt-puskesmas-hancur.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Disebut Netizen Pencitraan hingga Tak Sanggup Biayai Anak, Ruben Onsu Bereaksi: Saya Masih Mampu",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:45:30 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Presenter Ruben Onsu memberikan tanggapannya usai disebut netizen pencitraan hingga tak sanggup biayai anak.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/seleb/7869246/disebut-netizen-pencitraan-hingga-tak-sanggup-biayai-anak-ruben-onsu-bereaksi-saya-masih-mampu",
+    "URL Gambar": "https://asset.tribunnews.com/ZG3_PDED1CjlCCKn-J5WB8tswOA=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/Ruben-Onsu-KPAI.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Gotong Royong di 21 Kecamatan, Rico Waas Dengarkan Keluhan Warga soal Narkoba hingga Adminduk",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:44:50 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Rico Waas ikut gotong royong di 21 kecamatan sekaligus menyerap aspirasi warga terkait lingkungan hingga layanan publik.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/regional/7869245/gotong-royong-di-21-kecamatan-rico-waas-dengarkan-keluhan-warga-soal-narkoba-hingga-adminduk",
+    "URL Gambar": "https://asset.tribunnews.com/a0NqoPrO9NULaB7QhpNv5XICJnw=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/walkot-medan-gotong-royong.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Cerai dari Jonathan Frizzy, Dhena Devanka Tak Ingin Anaknya Kena Dampak Konflik dengan Mantan",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:32:53 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Cerai dari Jonathan Frizzy , Dhena Devanka tak ingin anaknya terkena dampak konfliknya dengan mantan suami.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/seleb/7869244/cerai-dari-jonathan-frizzy-dhena-devanka-tak-ingin-anaknya-kena-dampak-konflik-dengan-mantan",
+    "URL Gambar": "https://asset.tribunnews.com/qrk1XgvsvMMczdBeqzH1wgXHSNY=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/Dhena-Devanka-ditemui-di-Jakarta-Selatan-pada-7-September-2022.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "3 Wakil Indonesia Mendadak Tampil di Kejuaraan Dunia BWF 2026: Senang dan Tidak Menyangka",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:30:51 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Tiga pasangan mendadak dapat tiket Kejuaraan Dunia BWF 2026, membuat Indonesia kini berkekuatan 14 wakil.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/sport/7869243/3-wakil-indonesia-mendadak-tampil-di-kejuaraan-dunia-bwf-2026-senang-dan-tidak-menyangka",
+    "URL Gambar": "https://asset.tribunnews.com/4JttT0FK9tpaG5V6Btc0yHK4aXw=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/PENAMBAHAN-PEMAIN-Tim-Indonesia-mendapatkan-tiga-wakil-tambahan.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Riwayat Pendidikan Alumni S2 Hukum UGM yang Prediksinya 100 Persen Akurat soal Jokowi Bawa Ijazah",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:25:29 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Berikut ini adalah riwayat pendidikan dari alumni S2 Ilmu Hukum UGM, Firmanto Laksana yang prediksinya 100 persen akurat soal Jokowi bawa Ijazah.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/nasional/7869242/riwayat-pendidikan-alumni-s2-hukum-ugm-yang-prediksinya-100-persen-akurat-soal-jokowi-bawa-ijazah",
+    "URL Gambar": "https://asset.tribunnews.com/t3b8769g1alZ446PDaXw11x7axM=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/firmanto-jokowi-roy-suryo-dokter-tifa.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Daftar Promo Spesial BRI Rayakan HUT Ke-81 RI, Ada Diskon Kuliner hingga Tiket Bioskop",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:24:27 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "BRI hadirkan Promo Spesial HUT ke-81 RI untuk segmen kuliner, travel, dan hiburan dengan QRIS BRImo, Debit, serta Kartu Kredit.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/bisnis/7869241/daftar-promo-spesial-bri-rayakan-hut-ke-81-ri-ada-diskon-kuliner-hingga-tiket-bioskop",
+    "URL Gambar": "https://asset.tribunnews.com/V1MQfeTZ2RI_N5nvXsq4ZOqDYjE=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/PROMO-SPESIAL-BRI.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Dihujat, Chika Jessica Unggah Foto Bareng Ruben Onsu Diedit Pakai Baju Nikah saat Momen Ultah",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:22:34 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Chika Jessica banjir hujatan dari warganet lantaran posting foto bareng Ruben Onsu yang diedit mengenakan pakaian menikah.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/seleb/7869240/dihujat-chika-jessica-unggah-foto-bareng-ruben-onsu-diedit-pakai-baju-nikah-saat-momen-ultah",
+    "URL Gambar": "https://asset.tribunnews.com/wpq8JqFCRp5J0PkzpD7wXdauEVI=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/chika-jessica-tendean2.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Kuasa Hukum Singgung soal Perjanjian yang Telah Ditandatangani oleh Ruben Onsu dan Sarwendah",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:21:23 +0700",
+    "Penulis": "Redaksi Tribunnews",
+    "Ringkasan": "Kuasa hukum mendadak menyinggung soal perjanjian yang telah ditandatangani oleh Ruben Onsu dan Sarwendah saat dalam proses perceraian.",
+    "Sentimen": "Netral",
+    "Link": "https://www.tribunnews.com/seleb/7869239/kuasa-hukum-singgung-soal-perjanjian-yang-telah-ditandatangani-oleh-ruben-onsu-dan-sarwendah",
+    "URL Gambar": "https://asset.tribunnews.com/sykqkZp_kzwqVmhypYwkcHs2J6I=/148x99/filters:quality(30):format(webp):focal(0.5x0.5:0.5x0.5)/tribunnews/foto/bank/originals/sarwendah-ke-kpai.jpg",
+    "Media": "Tribunnews"
+  },
+  {
+    "Kategori": "Bisnis",
+    "Judul": "Pelindo Siap Kolaborasi Integrasikan Tol Cibitung-Cilincing hingga Akses Tanjung Priok",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:58:38 +0700",
+    "Penulis": "Friska Yolandha",
+    "Ringkasan": "REPUBLIKA.CO.ID, JAKARTA — PT Pelabuhan Indonesia (Persero) atau Pelindo menegaskan komitmennya untuk mendukung penuh rencana integrasi jalan tol yang digagas pemerintah melalui Kementerian Pekerjaan Umum (PU). Langkah integrasi ini...",
+    "Sentimen": "Netral",
+    "Link": "https://ekonomi.republika.co.id/berita/tjuj5q370/pelindo-siap-kolaborasi-integrasikan-tol-cibitungcilincing-hingga-akses-tanjung-priok",
+    "URL Gambar": "https://static.republika.co.id/uploads/images/detailnews/_260816115741-700.png",
+    "Media": "Republika"
+  },
+  {
+    "Kategori": "Finansial",
+    "Judul": "Prabowo Ingin Jadikan Pasar Modal Indonesia Terbesar di Dunia",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:54:27 +0700",
+    "Penulis": "Erik Purnama Putra",
+    "Ringkasan": "REPUBLIKA.CO.ID, JAKARTA -- Presiden RI menjanjikan untuk memperkuat posisi Indonesia dalam perdagangan komoditas strategis dunia dengan membangun bursa mineral dan komoditas strategis di dalam negeri. Kebijakan tersebut diarahkan agar Indonesia...",
+    "Sentimen": "Netral",
+    "Link": "https://ekonomi.republika.co.id/berita/tjuiyr484/prabowo-ingin-jadikan-pasar-modal-indonesia-terbesar-di-dunia",
+    "URL Gambar": "https://static.republika.co.id/uploads/images/detailnews/062387500-1786686101-830-556.jpg",
+    "Media": "Republika"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Pemerintah Percepat Penanganan Gempa NTT, Jalan dan Jembatan Rusak Jadi Prioritas",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:58:03 +0700",
+    "Penulis": "Liputan6.com",
+    "Ringkasan": "Pemerintah pusat dan pemerintah daerah terus berkoordinasi, termasuk dalam memastikan kesiapan anggaran untuk menangani kebutuhan akibat bencana.",
+    "Sentimen": "Netral",
+    "Link": "https://www.liputan6.com/news/read/8270946/pemerintah-percepat-penanganan-gempa-ntt-jalan-dan-jembatan-rusak-jadi-prioritas",
+    "URL Gambar": "https://cdn1-production-images-kly.akamaized.net/_DuCyPQRZwEG9XiOZcC6BSwCtR0=/673x379/smart/filters:quality(75):strip_icc():format(webp)/kly-media-production/medias/9325302/original/009011600_1786856281-WhatsApp_Image_2026-08-16_at_11.29.43.jpeg",
+    "Media": "Liputan6"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Kendala Penyaluran Bantuan untuk Korban Gempa Manggarai",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:50:21 +0700",
+    "Penulis": "Liputan6.com",
+    "Ringkasan": "Pemerintah daerah masih melakukan pendataan warga terdampak sebelum bantuan disalurkan lebih lanjut.",
+    "Sentimen": "Netral",
+    "Link": "https://www.liputan6.com/news/read/8270940/kendala-penyaluran-bantuan-untuk-korban-gempa-manggarai",
+    "URL Gambar": "https://cdn1-production-images-kly.akamaized.net/dMQETPjhvRO_SSDiw_aYIfP9OWs=/673x379/smart/filters:quality(75):strip_icc():format(webp)/kly-media-production/medias/9325193/original/043276700_1786845985-ten5.jpg",
+    "Media": "Liputan6"
+  },
+  {
+    "Kategori": "News",
+    "Judul": "Pramono Ungkap Kendala Modifikasi Cuaca Jakarta di Tengah Polusi Udara",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 11:38:43 +0700",
+    "Penulis": "Liputan6.com",
+    "Ringkasan": "Gubernur DKI Jakarta Pramono Anung mengungkap kendala pelaksanaan modifikasi cuaca untuk mengatasi kekeringan dan polusi udara di Jakarta.",
+    "Sentimen": "Netral",
+    "Link": "https://www.liputan6.com/news/read/8270935/pramono-ungkap-kendala-modifikasi-cuaca-jakarta-di-tengah-polusi-udara",
+    "URL Gambar": "https://cdn1-production-images-kly.akamaized.net/BciATTOic643MhSI8OphV_W4u4o=/673x379/smart/filters:quality(75):strip_icc():format(webp)/kly-media-production/medias/9321452/original/026657000_1786442263-aae5a694-28b2-47cc-9dff-974e32a8efc3.jpg",
+    "Media": "Liputan6"
+  },
+  {
+    "Kategori": "Regional",
+    "Judul": "Pos Lantas Margorejo dan Cito Surabaya Diduga Dilempar Bom Molotov oleh OTK",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 12:21:59 +0700",
+    "Penulis": "Kompas Cyber Media",
+    "Ringkasan": "Dua pos lantas di Surabaya dilempar bom molotov oleh OTK, polisi perketat patroli dan selidiki identitas pelaku.",
+    "Sentimen": "Netral",
+    "Link": "https://surabaya.kompas.com/read/2026/08/16/122145778/pos-lantas-margorejo-dan-cito-surabaya-diduga-dilempar-bom-molotov-oleh-otk",
+    "URL Gambar": "https://asset.kompas.com/crops/MpvAzjSIgf4lfzpF-TczrONW1ds=/0x0:0x0/1200x675/filters:watermark(data/photo/2026/01/30/697c815a5f0b9.png,0,-0,1)/data/photo/2026/08/16/6a8146177f59a.jpeg",
+    "Media": "Kompas"
+  },
+  {
+    "Kategori": "Bola",
+    "Judul": "Persebaya Menang Tipis Atas Penang FC, Bernardo Tavares Soroti Dua Hal",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 12:21:59 +0700",
+    "Penulis": "Kompas Cyber Media",
+    "Ringkasan": "Persebaya menang 1-0 atas Penang FC di laga uji coba, Bernardo Tavares menilai Bajul Ijo masih punya pekerjaan rumah sebelum Super League.",
+    "Sentimen": "Netral",
+    "Link": "https://bola.kompas.com/read/2026/08/16/11583308/persebaya-menang-tipis-atas-penang-fc-bernardo-tavares-soroti-dua-hal",
+    "URL Gambar": "https://asset.kompas.com/crops/0HpV34uIHibSzWLmxwJWm9T6xlI=/0x0:2911x1941/1200x675/filters:watermark(data/photo/2026/01/30/697c8163c3944.png,0,-0,1)/data/photo/2026/08/15/6a806208a1e60.jpg",
+    "Media": "Kompas"
+  },
+  {
+    "Kategori": "Money",
+    "Judul": "Mengenang Pendiri FedEx, Frederick W. Smith, lewat Pesawat Rosie",
+    "Tanggal Terbit": "Sun, 16 Aug 2026 12:21:59 +0700",
+    "Penulis": "Kompas Cyber Media",
+    "Ringkasan": "FedEx mengenang pendirinya, Frederick W. Smith, lewat pesawat Rosie, nama sang cucu, hingga bandara yang kini menyandang namanya.",
+    "Sentimen": "Netral",
+    "Link": "https://money.kompas.com/read/2026/08/16/112352326/mengenang-pendiri-fedex-frederick-w-smith-lewat-pesawat-rosie",
+    "URL Gambar": "https://asset.kompas.com/crops/LUXPQ5nLOhxTzJtFDEU3_hQRCC8=/324x113:1676x1013/1200x675/filters:watermark(data/photo/2026/01/30/697c815e7ef28.png,0,-0,1)/data/photo/2026/08/16/6a813b335beab.jpg",
     "Media": "Kompas"
   }
 ]
