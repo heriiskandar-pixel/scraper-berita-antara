@@ -37,7 +37,7 @@ MAX_WORKERS = 12
 # supaya gampang diganti tanpa edit kode kalau repo model ini bermasalah.
 SENTIMEN_MODEL_ID = os.environ.get(
     "SENTIMEN_MODEL_ID",
-    "witosetiadi/indobert-base-cased-sentiment-analysis"
+    "mdhugol/indonesia-bert-sentiment-classification"
 )
 
 HEADERS = {
