@@ -371,11 +371,11 @@
   <input type="text" id="cari" placeholder="Cari kata kunci...">
 
   <div class="group-view">
-    <button id="btn-view-table" class="aktif" title="Tampilan Tabel">
+    <button id="btn-view-table" title="Tampilan Tabel">
       <svg viewBox="0 0 16 16"><path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v2.5h13v-2.5a.25.25 0 0 0-.25-.25Zm13 4h-13v3h13Zm0 4.5h-13v3.75c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25Z"/></svg>
       Tabel
     </button>
-    <button id="btn-view-card" title="Tampilan Kartu">
+    <button id="btn-view-card" class="aktif" title="Tampilan Kartu">
       <svg viewBox="0 0 16 16"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5ZM9 2.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5ZM1 10.5A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5ZM9 10.5A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a.5.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5Zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5Z"/></svg>
       Kartu
     </button>
@@ -398,7 +398,7 @@ let filterTanggal = getTanggalHariIniFormat(); // Set default filter tanggal ke 
 let filterKategori = null; 
 let filterSentimen = null; 
 let filterMedia = null;
-let modeView = 'table'; 
+let modeView = 'card'; // Default: tampilan kartu
 
 let kolomUrut = null;
 let arahUrut = 1;
@@ -473,6 +473,17 @@ function ambilTanggalBaris(b) {
     return `${yyyy}-${mm}-${dd}`;
   }
   return str.substring(0, 10);
+}
+
+// Mengambil timestamp (tanggal + jam) untuk keperluan pengurutan "terbaru".
+// Mengembalikan 0 jika tidak dapat di-parse, sehingga baris tanpa tanggal valid
+// akan berada di posisi paling akhir saat diurutkan menurun (terbaru dahulu).
+function ambilWaktuBaris(b) {
+  const mentah = b._tanggalFile || b['Tanggal Terbit'] || b['Tanggal'] || b['Date'] || '';
+  if (!mentah) return 0;
+  const parsed = new Date(String(mentah).trim());
+  if (!isNaN(parsed.getTime())) return parsed.getTime();
+  return 0;
 }
 
 function escapeHtml(str) {
@@ -856,6 +867,9 @@ function renderTampilanUtama() {
       const vb = String(b[kolomUrut] ?? '');
       return va.localeCompare(vb, 'id') * arahUrut;
     });
+  } else {
+    // Default: urutkan berdasarkan tanggal & jam terbit terbaru lebih dulu
+    data.sort((a, b) => ambilWaktuBaris(b) - ambilWaktuBaris(a));
   }
 
   renderKPICards(data);
