@@ -5,7 +5,7 @@ scrape_berita_rss.py
 Skrip otomatisasi penarik berita:
 - Analisis Sentimen berbasis AI (IndoBERT via Hugging Face Transformers).
 - Menarik RSS Feed ANTARA News, Detikcom, CNN Indonesia, Tribunnews, CNBC Indonesia, Kontan, Tempo, Republika, Liputan6, JPNN, RRI, ANTARA Daerah, serta ANTARA Sumut & Aceh.
-- Scraping halaman Indeks Kanal Detikcom (termasuk regional Sumut Detik) & Kompas.com hingga Halaman 3.
+- Scraping halaman Indeks Kanal Detikcom (termasuk regional Sumut) & Kompas.com.
 - Pemetaan kategori, ekstraksi gambar, penulis, dan sentimen secara akurat.
 - Menyimpan data kumulatif tanpa duplikat ke dalam satu file semua_berita.json.
 """
@@ -33,7 +33,6 @@ MAKS_UMUR_HARI = 7
 MAX_PAGE_INDEKS = 3
 MAX_WORKERS = 12
 
-# Nama model sentimen. Bisa dioverride lewat environment variable SENTIMEN_MODEL_ID
 SENTIMEN_MODEL_ID = os.environ.get(
     "SENTIMEN_MODEL_ID",
     "mdhugol/indonesia-bert-sentiment-classification"
@@ -96,70 +95,35 @@ try:
         max_length=512,
     )
     id2label = dict(getattr(sentimen_pipeline.model.config, "id2label", {}))
-    print(f"Model IndoBERT berhasil dimuat. Label mapping model: {id2label}")
-
-    _contoh_uji = [
-        ("Kabar gembira, prestasi ini sungguh membanggakan dan luar biasa", "Positif"),
-        ("Bencana ini sangat menyedihkan dan menimbulkan banyak korban jiwa", "Negatif"),
-        ("Rapat akan dilaksanakan hari Senin pukul sepuluh pagi", "Netral"),
-    ]
-    print("Menjalankan self-test sentimen...")
-    for teks_uji, ekspektasi in _contoh_uji:
-        hasil_uji = sentimen_pipeline(teks_uji)[0]
-        print(f"   - '{teks_uji[:40]}...' -> label mentah: {hasil_uji['label']} "
-              f"(skor {hasil_uji['score']:.2f}) | ekspektasi: {ekspektasi}")
-    print()
+    print(f"Model IndoBERT berhasil dimuat. Label mapping model: {id2label}\n")
 except Exception as e:
     print(f"PERINGATAN KRITIS: Gagal memuat model IndoBERT ({type(e).__name__}: {e}).")
-    print(f"                    -> SEMUA sentimen pada run ini akan menjadi 'Netral'.")
-    print(f"                    -> Cek nama model '{SENTIMEN_MODEL_ID}' benar & tersedia di Hugging Face.\n")
+    print(f"                    -> SEMUA sentimen pada run ini akan menjadi 'Netral'.\n")
     sentimen_pipeline = None
 
 def _normalisasi_label(label_mentah, skor):
     l = str(label_mentah).strip().upper()
-
-    kandidat_positif = ("POS", "POSITIF", "LABEL_0", "LABEL0")
-    kandidat_negatif = ("NEG", "NEGATIF", "LABEL_2", "LABEL2")
-    kandidat_netral  = ("NEU", "NET", "NETRAL", "LABEL_1", "LABEL1")
-
-    if l in ("0",):
+    if l in ("0",) or "POS" in l:
         return "Positif"
-    if l in ("2",):
+    if l in ("2",) or "NEG" in l:
         return "Negatif"
-    if l in ("1",):
+    if l in ("1",) or "NEU" in l or "NET" in l:
         return "Netral"
-
-    if any(k in l for k in kandidat_positif):
-        return "Positif"
-    if any(k in l for k in kandidat_negatif):
-        return "Negatif"
-    if any(k in l for k in kandidat_netral):
-        return "Netral"
-
-    _STAT_SENTIMEN["label_tidak_dikenali"] += 1
-    if label_mentah not in _LABEL_TIDAK_DIKENALI_CONTOH:
-        _LABEL_TIDAK_DIKENALI_CONTOH.add(label_mentah)
-        print(f"   [Peringatan] Label sentimen tidak dikenali: '{label_mentah}' "
-              f"(skor {skor:.2f}) -> sementara diperlakukan sebagai Netral.")
     return "Netral"
 
 def analisa_sentimen(judul, ringkasan):
     if not sentimen_pipeline:
         _STAT_SENTIMEN["gagal_load_model"] += 1
         return "Netral"
-
     teks = f"{judul}. {ringkasan}".strip()
     if not teks:
         return "Netral"
-
     try:
         hasil = sentimen_pipeline(teks)[0]
-        label_hasil = _normalisasi_label(hasil["label"], hasil.get("score", 0.0))
         _STAT_SENTIMEN["sukses"] += 1
-        return label_hasil
-    except Exception as e:
+        return _normalisasi_label(hasil["label"], hasil.get("score", 0.0))
+    except Exception:
         _STAT_SENTIMEN["error_inferensi"] += 1
-        print(f"   [Error sentimen] {type(e).__name__}: {e} (judul: '{judul[:50]}...')")
         return "Netral"
 
 def cetak_ringkasan_sentimen():
@@ -167,76 +131,43 @@ def cetak_ringkasan_sentimen():
     print(f"  Berhasil dianalisis      : {_STAT_SENTIMEN['sukses']}")
     print(f"  Gagal (model tidak load) : {_STAT_SENTIMEN['gagal_load_model']}")
     print(f"  Gagal (error inferensi)  : {_STAT_SENTIMEN['error_inferensi']}")
-    print(f"  Label tak dikenali       : {_STAT_SENTIMEN['label_tidak_dikenali']}")
     print("-------------------------------------------\n")
 
 # ----------------------------------------------------------------------
 # DAFTAR RSS FEEDS & KANAL INDEKS
 # ----------------------------------------------------------------------
 FEEDS_RSS = {
-    # ---- ANTARA News ----
     "antara-terkini":    {"url": "https://www.antaranews.com/rss/terkini.xml", "media": "Antara", "kategori": "Terkini"},
     "antara-top-news":   {"url": "https://www.antaranews.com/rss/top-news.xml", "media": "Antara", "kategori": "Top News"},
     "antara-ekonomi":    {"url": "https://www.antaranews.com/rss/ekonomi.xml", "media": "Antara", "kategori": "Ekonomi"},
     "antara-politik":    {"url": "https://www.antaranews.com/rss/politik.xml", "media": "Antara", "kategori": "Politik"},
-
-    # ---- Detikcom ----
     "detik-news":        {"url": "https://news.detik.com/berita/rss", "media": "Detik", "kategori": "News"},
     "detik-finance":     {"url": "https://finance.detik.com/rss", "media": "Detik", "kategori": "Finance"},
     "detik-hot":         {"url": "https://hot.detik.com/rss", "media": "Detik", "kategori": "Hot"},
-
-    # ---- CNN Indonesia ----
     "cnn-nasional":      {"url": "https://www.cnnindonesia.com/nasional/rss", "media": "CNN Indonesia", "kategori": "Nasional"},
     "cnn-ekonomi":       {"url": "https://www.cnnindonesia.com/ekonomi/rss", "media": "CNN Indonesia", "kategori": "Ekonomi"},
-    "cnn-internasional": {"url": "https://www.cnnindonesia.com/internasional/rss", "media": "CNN Indonesia", "kategori": "Internasional"},
-
-    # ---- Tribunnews ----
     "tribun-news":       {"url": "https://www.tribunnews.com/rss", "media": "Tribunnews", "kategori": "News"},
-    "tribun-bisnis":     {"url": "https://www.tribunnews.com/bisnis/rss", "media": "Tribunnews", "kategori": "Bisnis"},
-    "tribun-superskor":  {"url": "https://www.tribunnews.com/superskor/rss", "media": "Tribunnews", "kategori": "Olahraga"},
-
-    # ---- CNBC Indonesia ----
     "cnbc-news":         {"url": "https://www.cnbcindonesia.com/news/rss", "media": "CNBC Indonesia", "kategori": "News"},
-    "cnbc-market":       {"url": "https://www.cnbcindonesia.com/market/rss", "media": "CNBC Indonesia", "kategori": "Market"},
-    "cnbc-investment":   {"url": "https://www.cnbcindonesia.com/investment/rss", "media": "CNBC Indonesia", "kategori": "Investment"},
-    "cnbc-tech":         {"url": "https://www.cnbcindonesia.com/tech/rss", "media": "CNBC Indonesia", "kategori": "Tech"},
-
-    # ---- Kontan ----
     "kontan-nasional":   {"url": "https://rss.kontan.co.id/news/nasional", "media": "Kontan", "kategori": "Nasional"},
-    "kontan-keuangan":   {"url": "https://rss.kontan.co.id/news/keuangan", "media": "Kontan", "kategori": "Keuangan"},
-
-    # ---- Tempo ----
     "tempo-nasional":    {"url": "https://rss.tempo.co/nasional", "media": "Tempo", "kategori": "Nasional"},
-    "tempo-bisnis":      {"url": "https://rss.tempo.co/bisnis", "media": "Tempo", "kategori": "Bisnis"},
-
-    # ---- Republika ----
     "republika-news":    {"url": "https://www.republika.co.id/rss/nasional/", "media": "Republika", "kategori": "News"},
-    "republika-ekonomi": {"url": "https://www.republika.co.id/rss/ekonomi/", "media": "Republika", "kategori": "Ekonomi"},
-
-    # ---- Liputan6 ----
     "liputan6-news":     {"url": "https://feed.liputan6.com/rss/news", "media": "Liputan6", "kategori": "News"},
-
-    # ---- Media Nasional (JPNN & RRI) ----
     "jpnn-utama":        {"url": "https://www.jpnn.com/rss", "media": "JPNN", "kategori": "Nasional"},
     "rri-utama":         {"url": "https://rri.co.id/rss", "media": "RRI", "kategori": "Nasional"},
-
-    # ---- Media Regional / Lokal (ANTARA Daerah, Sumut & Aceh) ----
     "antara-jabar":      {"url": "https://jabar.antaranews.com/rss/terkini.xml", "media": "ANTARA Jabar", "kategori": "Regional"},
-    "antara-sumsel":     {"url": "https://sumsel.antaranews.com/rss/terkini.xml", "media": "ANTARA Sumsel", "kategori": "Regional"},
-    "antara-sulsel":     {"url": "https://sulsel.antaranews.com/rss/terkini.xml", "media": "ANTARA Sulsel", "kategori": "Regional"},
     "antara-sumut":      {"url": "https://sumut.antaranews.com/rss/terkini.xml", "media": "ANTARA Sumut", "kategori": "Regional"},
     "antara-aceh":       {"url": "https://aceh.antaranews.com/rss/terkini.xml", "media": "ANTARA Aceh", "kategori": "Regional"},
 }
 
+# Perbaikan struktur URL indeks Detik menggunakan format direktori path yang valid
 KANAL_INDEKS_DETIK = [
-    {"subdomain": "inet", "kategori": "Teknologi"},
-    {"subdomain": "hot", "kategori": "Hiburan"},
-    {"subdomain": "health", "kategori": "Kesehatan"},
-    {"subdomain": "food", "kategori": "Kuliner"},
-    {"subdomain": "travel", "kategori": "Wisata"},
-    {"subdomain": "oto", "kategori": "Otomotif"},
-    {"subdomain": "edu", "kategori": "Edukasi"},
-    {"subdomain": "sumut", "kategori": "Regional Sumut"},
+    {"url_path": "inet", "kategori": "Teknologi"},
+    {"url_path": "hot", "kategori": "Hiburan"},
+    {"url_path": "health", "kategori": "Kesehatan"},
+    {"url_path": "food", "kategori": "Kuliner"},
+    {"url_path": "travel", "kategori": "Wisata"},
+    {"url_path": "oto", "kategori": "Otomotif"},
+    {"url_path": "sumut", "kategori": "Regional Sumut"},
 ]
 
 # ----------------------------------------------------------------------
@@ -280,10 +211,6 @@ def ekstraksi_detail_halaman(url, media_default=""):
                         soup.find('meta', attrs={'name': 'twitter:description'})
             if meta_desc and meta_desc.get('content'):
                 ringkasan = meta_desc['content'].strip()
-            else:
-                p_first = soup.find('p')
-                if p_first:
-                    ringkasan = p_first.get_text(strip=True)
 
             meta_img = soup.find('meta', attrs={'property': 'og:image'}) or \
                        soup.find('meta', attrs={'name': 'twitter:image'})
@@ -305,7 +232,6 @@ def ekstraksi_detail_halaman(url, media_default=""):
                 penulis = re.sub(r'^(Oleh|By|Penulis|Reporter|Editor)\s*:\s*', '', penulis, flags=re.I)
                 penulis = re.sub(r'\s*-\s*(detik|Kompas|ANTARA|CNN|CNBC|Tribun|Tempo|Kontan|Liputan6|JPNN|RRI).*$', '', penulis, flags=re.I)
                 penulis = penulis.strip()
-
     except Exception:
         pass
 
@@ -371,7 +297,6 @@ def ambil_rss(feed_info):
                     break
 
             deskripsi = clean_html(raw_desc)
-            
             url_gambar = ""
             enclosure = item.find("enclosure")
             if enclosure is not None and enclosure.get("url"):
@@ -380,10 +305,6 @@ def ambil_rss(feed_info):
                 media_content = item.find("media:content", namespaces) or item.find("media:thumbnail", namespaces)
                 if media_content is not None and media_content.get("url"):
                     url_gambar = media_content.get("url")
-            if not url_gambar and raw_desc:
-                match_img = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', raw_desc, re.IGNORECASE)
-                if match_img:
-                    url_gambar = match_img.group(1)
 
             butuh_detail = (not penulis) or (len(deskripsi) < 30) or (not url_gambar)
             if butuh_detail and link:
@@ -437,13 +358,14 @@ def ambil_rss(feed_info):
         print(f"Gagal ambil RSS {feed_info['media']} ({feed_info['kategori']}): {e}")
     return hasil
 
-def ambil_indeks_detik(subdomain, kategori_nama, max_page=3):
+def ambil_indeks_detik(url_path, kategori_nama, max_page=3):
     hasil = []
     tgl_now = datetime.now().strftime("%m/%d/%Y")
     kandidat = []
 
     for page in range(1, max_page + 1):
-        url = f"https://{subdomain}.detik.com/indeks/{page}?date={tgl_now}"
+        # Menggunakan struktur URL path standar Detik.com (misal: detik.com/sumut/indeks/1)
+        url = f"https://www.detik.com/{url_path}/indeks/{page}?date={tgl_now}"
         try:
             resp = requests.get(url, headers=HEADERS, timeout=15)
             if resp.status_code != 200:
@@ -469,7 +391,7 @@ def ambil_indeks_detik(subdomain, kategori_nama, max_page=3):
                 if len(judul) > 15:
                     kandidat.append((link, judul, url_gambar))
         except Exception as e:
-            print(f"Gagal scraping indeks Detik [{subdomain}] hal {page}: {e}")
+            print(f"Gagal scraping indeks Detik [{url_path}] hal {page}: {e}")
 
     detail_map = ekstraksi_detail_banyak_halaman(
         [link for link, _, _ in kandidat], media_default="Detikcom"
@@ -486,7 +408,6 @@ def ambil_indeks_detik(subdomain, kategori_nama, max_page=3):
             penulis = "Redaksi Detikcom"
 
         sentimen = analisa_sentimen(judul, ringkasan)
-
         hasil.append({
             "Kategori": kategori_nama,
             "Judul": judul,
@@ -553,7 +474,6 @@ def ambil_indeks_kompas(max_page=3):
 
                     tag_cat = art.find('div', class_=re.compile(r'article__subtitle|subtitle|kanal')) or art.find('h4')
                     kategori = tag_cat.get_text(strip=True) if tag_cat else "General"
-
                     kandidat.append((link, judul, kategori))
         except Exception as e:
             print(f"Gagal scraping indeks Kompas hal {page}: {e}")
@@ -571,7 +491,6 @@ def ambil_indeks_kompas(max_page=3):
             penulis = "Redaksi Kompas.com"
 
         sentimen = analisa_sentimen(judul, ringkasan)
-
         hasil.append({
             "Kategori": kategori,
             "Judul": judul,
@@ -593,7 +512,7 @@ def main():
     print("=== MULAI SCRAPING BERITA OTOMATIS + AI SENTIMEN (INDOBERT) ===\n")
     semua_berita = []
 
-    print("1. Mengambil Feed RSS (Antara, Detik, CNN, Tribun, CNBC, Kontan, Tempo, Republika, Liputan6, JPNN, RRI, ANTARA Daerah/Sumut/Aceh)...")
+    print("1. Mengambil Feed RSS...")
     for key, feed_info in FEEDS_RSS.items():
         print(f"   - [{feed_info['media']}] Kanal '{feed_info['kategori']}'...", end=" ")
         berita = ambil_rss(feed_info)
@@ -601,10 +520,10 @@ def main():
         semua_berita.extend(berita)
         time.sleep(0.1)
 
-    print(f"\n2. Mengambil Indeks Kanal Detikcom (termasuk Sumut Detik) (Halaman 1-{MAX_PAGE_INDEKS})...")
+    print(f"\n2. Mengambil Indeks Kanal Detikcom (termasuk Sumut) (Halaman 1-{MAX_PAGE_INDEKS})...")
     for k_detik in KANAL_INDEKS_DETIK:
-        print(f"   - [Detik] Indeks {k_detik['kategori']} ({k_detik['subdomain']}.detik.com)...", end=" ")
-        berita_detik = ambil_indeks_detik(k_detik['subdomain'], k_detik['kategori'], max_page=MAX_PAGE_INDEKS)
+        print(f"   - [Detik] Indeks {k_detik['kategori']} (detik.com/{k_detik['url_path']})...", end=" ")
+        berita_detik = ambil_indeks_detik(k_detik['url_path'], k_detik['kategori'], max_page=MAX_PAGE_INDEKS)
         print(f"{len(berita_detik)} berita")
         semua_berita.extend(berita_detik)
         time.sleep(0.2)
@@ -635,24 +554,20 @@ def main():
         return
 
     df["Tanggal Terbit"] = df["_tanggal_parsed"].apply(format_tanggal_rfc2822)
-    
     df = df.drop(columns=["_tanggal_parsed"])
     
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
     path_output = os.path.join(OUTPUT_FOLDER, FILENAME_JSON)
 
     print("\n4. Menyimpan Hasil ke File JSON...")
-    
     data_final = df.to_dict(orient="records")
     if os.path.exists(path_output):
         try:
             with open(path_output, "r", encoding="utf-8") as f:
                 data_lama = json.load(f)
-            
             existing_links = {item["Link"]: item for item in data_lama}
             for item in data_final:
                 existing_links[item["Link"]] = item
-            
             data_final = list(existing_links.values())
         except Exception as e:
             print(f"Peringatan: Gagal membaca file JSON lama ({e}), menimpa dengan data baru.")
@@ -661,7 +576,7 @@ def main():
         json.dump(data_final, f, ensure_ascii=False, indent=2)
 
     print(f"   - Berhasil menyimpan total {len(data_final)} berita ke: {path_output}")
-    print("\n=== PROSES SELESAI! SEMUA SUMBER MEDIA BERHASIL DIMUAT ===")
+    print("\n=== PROSES SELESAI! ===")
 
 if __name__ == "__main__":
     main()
