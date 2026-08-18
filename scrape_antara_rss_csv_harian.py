@@ -4,7 +4,7 @@ scrape_berita_rss.py
 ====================
 Skrip otomatisasi penarik berita:
 - Analisis Sentimen berbasis AI (IndoBERT via Hugging Face Transformers).
-- Menarik RSS Feed ANTARA News, Detikcom, CNN Indonesia, Tribunnews, CNBC Indonesia, Kontan, Tempo, & Republika.
+- Menarik RSS Feed ANTARA News, Detikcom, CNN Indonesia, Tribunnews, CNBC Indonesia, Kontan, Tempo, Republika, Liputan6, JPNN, RRI, & ANTARA Daerah.
 - Scraping halaman Indeks Kanal Detikcom & Kompas.com hingga Halaman 3.
 - Pemetaan kategori, ekstraksi gambar, penulis, dan sentimen secara akurat.
 - Menyimpan data kumulatif tanpa duplikat ke dalam satu file semua_berita.json.
@@ -34,7 +34,6 @@ MAX_PAGE_INDEKS = 3
 MAX_WORKERS = 12
 
 # Nama model sentimen. Bisa dioverride lewat environment variable SENTIMEN_MODEL_ID
-# supaya gampang diganti tanpa edit kode kalau repo model ini bermasalah.
 SENTIMEN_MODEL_ID = os.environ.get(
     "SENTIMEN_MODEL_ID",
     "mdhugol/indonesia-bert-sentiment-classification"
@@ -79,9 +78,6 @@ def _http_get(url, timeout=15, gunakan_cloudscraper=False):
 # ----------------------------------------------------------------------
 # INISIALISASI MODEL AI SENTIMEN (INDOBERT)
 # ----------------------------------------------------------------------
-# Statistik debug sentimen: dipakai untuk melaporkan ringkasan di akhir run,
-# supaya kalau ada masalah (model gagal load / label tidak dikenali / error
-# inferensi) itu KELIHATAN JELAS, bukan cuma diam-diam jadi "Netral" semua.
 _STAT_SENTIMEN = {
     "sukses": 0,
     "gagal_load_model": 0,
@@ -99,15 +95,9 @@ try:
         truncation=True,
         max_length=512,
     )
-    # Cetak mapping label ASLI dari model. Ini penting untuk verifikasi manual:
-    # kalau modelnya ternyata memberi label "0"/"1"/"2" polos atau urutan
-    # positif/negatif terbalik, kamu akan langsung tahu dari log ini.
     id2label = dict(getattr(sentimen_pipeline.model.config, "id2label", {}))
     print(f"Model IndoBERT berhasil dimuat. Label mapping model: {id2label}")
 
-    # Self-test cepat dengan 3 kalimat contoh yang polaritasnya jelas.
-    # Kalau hasilnya tidak sesuai ekspektasi, kita tahu dari awal (sebelum
-    # scraping ratusan berita) bahwa mapping label perlu disesuaikan.
     _contoh_uji = [
         ("Kabar gembira, prestasi ini sungguh membanggakan dan luar biasa", "Positif"),
         ("Bencana ini sangat menyedihkan dan menimbulkan banyak korban jiwa", "Negatif"),
@@ -122,29 +112,16 @@ try:
 except Exception as e:
     print(f"PERINGATAN KRITIS: Gagal memuat model IndoBERT ({type(e).__name__}: {e}).")
     print(f"                    -> SEMUA sentimen pada run ini akan menjadi 'Netral'.")
-    print(f"                    -> Cek nama model '{SENTIMEN_MODEL_ID}' benar & tersedia di Hugging Face,")
-    print(f"                       koneksi internet, dan dependency (mis. sentencepiece) sudah terpasang.\n")
+    print(f"                    -> Cek nama model '{SENTIMEN_MODEL_ID}' benar & tersedia di Hugging Face.\n")
     sentimen_pipeline = None
 
 def _normalisasi_label(label_mentah, skor):
-    """
-    Mengubah label mentah dari model (format bisa macam-macam: 'LABEL_0',
-    'POSITIVE', 'positif', '0', dst.) menjadi salah satu dari
-    'Positif' / 'Negatif' / 'Netral'.
-
-    Dibuat lebih permisif daripada versi lama supaya tidak diam-diam
-    menjebloskan hasil yang seharusnya positif/negatif ke 'Netral' hanya
-    karena format labelnya sedikit berbeda dari yang diasumsikan.
-    """
     l = str(label_mentah).strip().upper()
 
     kandidat_positif = ("POS", "POSITIF", "LABEL_0", "LABEL0")
     kandidat_negatif = ("NEG", "NEGATIF", "LABEL_2", "LABEL2")
     kandidat_netral  = ("NEU", "NET", "NETRAL", "LABEL_1", "LABEL1")
 
-    # Cek label angka polos ("0"/"1"/"2") -- beberapa model fine-tune
-    # tidak diberi id2label yang proper sehingga pipeline mengembalikan
-    # angka mentah alih-alih 'LABEL_0' dst.
     if l in ("0",):
         return "Positif"
     if l in ("2",):
@@ -159,14 +136,11 @@ def _normalisasi_label(label_mentah, skor):
     if any(k in l for k in kandidat_netral):
         return "Netral"
 
-    # Label benar-benar tidak dikenali format apapun -> catat sebagai
-    # peringatan (bukan langsung dibungkam jadi Netral tanpa jejak).
     _STAT_SENTIMEN["label_tidak_dikenali"] += 1
     if label_mentah not in _LABEL_TIDAK_DIKENALI_CONTOH:
         _LABEL_TIDAK_DIKENALI_CONTOH.add(label_mentah)
         print(f"   [Peringatan] Label sentimen tidak dikenali: '{label_mentah}' "
-              f"(skor {skor:.2f}) -> sementara diperlakukan sebagai Netral. "
-              f"Tambahkan pemetaannya di _normalisasi_label().")
+              f"(skor {skor:.2f}) -> sementara diperlakukan sebagai Netral.")
     return "Netral"
 
 def analisa_sentimen(judul, ringkasan):
@@ -189,19 +163,15 @@ def analisa_sentimen(judul, ringkasan):
         return "Netral"
 
 def cetak_ringkasan_sentimen():
-    """Dipanggil di akhir run supaya kelihatan jelas apakah sentimen benar-benar jalan."""
     print("\n--- Ringkasan Proses Analisis Sentimen ---")
     print(f"  Berhasil dianalisis      : {_STAT_SENTIMEN['sukses']}")
     print(f"  Gagal (model tidak load) : {_STAT_SENTIMEN['gagal_load_model']}")
     print(f"  Gagal (error inferensi)  : {_STAT_SENTIMEN['error_inferensi']}")
     print(f"  Label tak dikenali       : {_STAT_SENTIMEN['label_tidak_dikenali']}")
-    if _STAT_SENTIMEN["gagal_load_model"] > 0:
-        print("  -> PERHATIAN: model sentimen gagal dimuat di awal run ini, "
-              "semua nilai di atas otomatis 'Netral'. Perbaiki dulu sebelum scraping ulang.")
     print("-------------------------------------------\n")
 
 # ----------------------------------------------------------------------
-# DAFTAR RSS FEEDS & KANAL INDEKS (DIPERBARUI)
+# DAFTAR RSS FEEDS & KANAL INDEKS
 # ----------------------------------------------------------------------
 FEEDS_RSS = {
     # ---- ANTARA News ----
@@ -245,6 +215,15 @@ FEEDS_RSS = {
 
     # ---- Liputan6 ----
     "liputan6-news":     {"url": "https://feed.liputan6.com/rss/news", "media": "Liputan6", "kategori": "News"},
+
+    # ---- Media Nasional (Tambahan Baru) ----
+    "jpnn-utama":        {"url": "https://www.jpnn.com/rss", "media": "JPNN", "kategori": "Nasional"},
+    "rri-utama":         {"url": "https://rri.co.id/rss", "media": "RRI", "kategori": "Nasional"},
+
+    # ---- Media Regional / Lokal (ANTARA Daerah) ----
+    "antara-jabar":      {"url": "https://jabar.antaranews.com/rss/terkini.xml", "media": "ANTARA Jabar", "kategori": "Regional"},
+    "antara-sumsel":     {"url": "https://sumsel.antaranews.com/rss/terkini.xml", "media": "ANTARA Sumsel", "kategori": "Regional"},
+    "antara-sulsel":     {"url": "https://sulsel.antaranews.com/rss/terkini.xml", "media": "ANTARA Sulsel", "kategori": "Regional"},
 }
 
 KANAL_INDEKS_DETIK = [
@@ -321,7 +300,7 @@ def ekstraksi_detail_halaman(url, media_default=""):
 
             if penulis:
                 penulis = re.sub(r'^(Oleh|By|Penulis|Reporter|Editor)\s*:\s*', '', penulis, flags=re.I)
-                penulis = re.sub(r'\s*-\s*(detik|Kompas|ANTARA|CNN|CNBC|Tribun|Tempo|Kontan|Liputan6).*$', '', penulis, flags=re.I)
+                penulis = re.sub(r'\s*-\s*(detik|Kompas|ANTARA|CNN|CNBC|Tribun|Tempo|Kontan|Liputan6|JPNN|RRI).*$', '', penulis, flags=re.I)
                 penulis = penulis.strip()
 
     except Exception:
@@ -493,6 +472,9 @@ def ambil_indeks_detik(subdomain, kategori_nama, max_page=3):
         [link for link, _, _ in kandidat], media_default="Detikcom"
     )
 
+    wib = timezone(timedelta(hours=7))
+    tgl_sekarang_wib = format_tanggal_rfc2822(datetime.now(wib))
+
     for link, judul, url_gambar in kandidat:
         ringkasan, img_detail, penulis = detail_map.get(link, ("", "", ""))
         if not url_gambar:
@@ -505,7 +487,7 @@ def ambil_indeks_detik(subdomain, kategori_nama, max_page=3):
         hasil.append({
             "Kategori": kategori_nama,
             "Judul": judul,
-            "Tanggal Terbit": format_tanggal_rfc2822(datetime.now(timezone(timedelta(hours=7)))),
+            "Tanggal Terbit": tgl_sekarang_wib,
             "Penulis": penulis,
             "Ringkasan": ringkasan,
             "Sentimen": sentimen,
@@ -577,6 +559,9 @@ def ambil_indeks_kompas(max_page=3):
         [link for link, _, _ in kandidat], media_default="Kompas.com"
     )
 
+    wib = timezone(timedelta(hours=7))
+    tgl_sekarang_wib = format_tanggal_rfc2822(datetime.now(wib))
+
     for link, judul, kategori in kandidat:
         ringkasan, url_gambar, penulis = detail_map.get(link, ("", "", ""))
         if not penulis:
@@ -587,7 +572,7 @@ def ambil_indeks_kompas(max_page=3):
         hasil.append({
             "Kategori": kategori,
             "Judul": judul,
-            "Tanggal Terbit": format_tanggal_rfc2822(datetime.now(timezone(timedelta(hours=7)))),
+            "Tanggal Terbit": tgl_sekarang_wib,
             "Penulis": penulis,
             "Ringkasan": ringkasan,
             "Sentimen": sentimen,
@@ -605,7 +590,7 @@ def main():
     print("=== MULAI SCRAPING BERITA OTOMATIS + AI SENTIMEN (INDOBERT) ===\n")
     semua_berita = []
 
-    print("1. Mengambil Feed RSS (Antara, Detik, CNN, Tribun, CNBC, Kontan, Tempo, Republika, Liputan6)...")
+    print("1. Mengambil Feed RSS (Antara, Detik, CNN, Tribun, CNBC, Kontan, Tempo, Republika, Liputan6, JPNN, RRI, ANTARA Daerah)...")
     for key, feed_info in FEEDS_RSS.items():
         print(f"   - [{feed_info['media']}] Kanal '{feed_info['kategori']}'...", end=" ")
         berita = ambil_rss(feed_info)
@@ -648,7 +633,6 @@ def main():
 
     df["Tanggal Terbit"] = df["_tanggal_parsed"].apply(format_tanggal_rfc2822)
     
-    # Bersihkan kolom bantu sebelum dimasukkan ke JSON
     df = df.drop(columns=["_tanggal_parsed"])
     
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
@@ -656,14 +640,12 @@ def main():
 
     print("\n4. Menyimpan Hasil ke File JSON...")
     
-    # Jika file JSON lama sudah ada, gabungkan data lama dengan data baru tanpa duplikat berdasarkan Link
     data_final = df.to_dict(orient="records")
     if os.path.exists(path_output):
         try:
             with open(path_output, "r", encoding="utf-8") as f:
                 data_lama = json.load(f)
             
-            # Gabungkan menggunakan dictionary dengan key "Link" untuk menghindari duplikasi
             existing_links = {item["Link"]: item for item in data_lama}
             for item in data_final:
                 existing_links[item["Link"]] = item
