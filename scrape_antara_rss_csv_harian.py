@@ -4,8 +4,8 @@ scrape_berita_rss.py
 ====================
 Skrip otomatisasi penarik berita:
 - Analisis Sentimen berbasis AI (IndoBERT via Hugging Face Transformers).
-- Menarik RSS Feed ANTARA News, Detikcom, CNN Indonesia, Tribunnews, CNBC Indonesia, Kontan, Tempo, Republika, Liputan6, JPNN, RRI, & ANTARA Daerah.
-- Scraping halaman Indeks Kanal Detikcom & Kompas.com hingga Halaman 3.
+- Menarik RSS Feed ANTARA News, Detikcom, CNN Indonesia, Tribunnews, CNBC Indonesia, Kontan, Tempo, Republika, Liputan6, JPNN, RRI, ANTARA Daerah, serta ANTARA Sumut & Aceh.
+- Scraping halaman Indeks Kanal Detikcom (termasuk regional Sumut Detik) & Kompas.com hingga Halaman 3.
 - Pemetaan kategori, ekstraksi gambar, penulis, dan sentimen secara akurat.
 - Menyimpan data kumulatif tanpa duplikat ke dalam satu file semua_berita.json.
 """
@@ -216,14 +216,16 @@ FEEDS_RSS = {
     # ---- Liputan6 ----
     "liputan6-news":     {"url": "https://feed.liputan6.com/rss/news", "media": "Liputan6", "kategori": "News"},
 
-    # ---- Media Nasional (Tambahan Baru) ----
+    # ---- Media Nasional (JPNN & RRI) ----
     "jpnn-utama":        {"url": "https://www.jpnn.com/rss", "media": "JPNN", "kategori": "Nasional"},
     "rri-utama":         {"url": "https://rri.co.id/rss", "media": "RRI", "kategori": "Nasional"},
 
-    # ---- Media Regional / Lokal (ANTARA Daerah) ----
+    # ---- Media Regional / Lokal (ANTARA Daerah, Sumut & Aceh) ----
     "antara-jabar":      {"url": "https://jabar.antaranews.com/rss/terkini.xml", "media": "ANTARA Jabar", "kategori": "Regional"},
     "antara-sumsel":     {"url": "https://sumsel.antaranews.com/rss/terkini.xml", "media": "ANTARA Sumsel", "kategori": "Regional"},
     "antara-sulsel":     {"url": "https://sulsel.antaranews.com/rss/terkini.xml", "media": "ANTARA Sulsel", "kategori": "Regional"},
+    "antara-sumut":      {"url": "https://sumut.antaranews.com/rss/terkini.xml", "media": "ANTARA Sumut", "kategori": "Regional"},
+    "antara-aceh":       {"url": "https://aceh.antaranews.com/rss/terkini.xml", "media": "ANTARA Aceh", "kategori": "Regional"},
 }
 
 KANAL_INDEKS_DETIK = [
@@ -234,6 +236,7 @@ KANAL_INDEKS_DETIK = [
     {"subdomain": "travel", "kategori": "Wisata"},
     {"subdomain": "oto", "kategori": "Otomotif"},
     {"subdomain": "edu", "kategori": "Edukasi"},
+    {"subdomain": "sumut", "kategori": "Regional Sumut"},
 ]
 
 # ----------------------------------------------------------------------
@@ -590,7 +593,7 @@ def main():
     print("=== MULAI SCRAPING BERITA OTOMATIS + AI SENTIMEN (INDOBERT) ===\n")
     semua_berita = []
 
-    print("1. Mengambil Feed RSS (Antara, Detik, CNN, Tribun, CNBC, Kontan, Tempo, Republika, Liputan6, JPNN, RRI, ANTARA Daerah)...")
+    print("1. Mengambil Feed RSS (Antara, Detik, CNN, Tribun, CNBC, Kontan, Tempo, Republika, Liputan6, JPNN, RRI, ANTARA Daerah/Sumut/Aceh)...")
     for key, feed_info in FEEDS_RSS.items():
         print(f"   - [{feed_info['media']}] Kanal '{feed_info['kategori']}'...", end=" ")
         berita = ambil_rss(feed_info)
@@ -598,7 +601,7 @@ def main():
         semua_berita.extend(berita)
         time.sleep(0.1)
 
-    print(f"\n2. Mengambil Indeks Kanal Detikcom (Halaman 1-{MAX_PAGE_INDEKS})...")
+    print(f"\n2. Mengambil Indeks Kanal Detikcom (termasuk Sumut Detik) (Halaman 1-{MAX_PAGE_INDEKS})...")
     for k_detik in KANAL_INDEKS_DETIK:
         print(f"   - [Detik] Indeks {k_detik['kategori']} ({k_detik['subdomain']}.detik.com)...", end=" ")
         berita_detik = ambil_indeks_detik(k_detik['subdomain'], k_detik['kategori'], max_page=MAX_PAGE_INDEKS)
