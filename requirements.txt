@@ -7,3 +7,4 @@ python-dateutil
 torch
 transformers
 cloudscraper
+Plotly
