@@ -167,7 +167,7 @@
   /* Grid Grafik */
   .grafik-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
     margin-bottom: 20px;
   }
@@ -214,6 +214,91 @@
     max-width: 100%;
   }
   .petunjuk { color: #6e7681; font-size: 11px; margin-top: 6px; }
+
+  /* Kalender Interaktif */
+  .kartu-kalender {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  .kalender-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .kalender-header h2 { font-size: 14px; margin: 0; color: #c9d1d9; }
+  .kalender-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .kalender-nav button {
+    padding: 4px 10px;
+    font-size: 13px;
+    line-height: 1;
+  }
+  .kalender-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e6edf3;
+    min-width: 130px;
+    text-align: center;
+  }
+  .kalender-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .kalender-hari-label {
+    text-align: center;
+    font-size: 11px;
+    color: #8b949e;
+    padding: 4px 0;
+  }
+  .kalender-sel {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: 6px;
+    border: 1px solid #21262d;
+    padding: 4px 6px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.15s ease;
+    min-height: 44px;
+    min-width: 0;
+  }
+  .kalender-sel:hover { border-color: #58a6ff; }
+  .kalender-sel.luar-bulan { opacity: 0.2; cursor: default; pointer-events: none; }
+  .kalender-sel.redup { opacity: 0.4; }
+  .kalender-sel.terpilih { border-color: #58a6ff; border-width: 2px; box-shadow: 0 0 0 1px #58a6ff; opacity: 1; }
+  .kalender-sel.hari-ini .kalender-tgl { color: #58a6ff; font-weight: 700; }
+  .kalender-tgl { font-size: 11px; color: #8b949e; }
+  .kalender-jumlah { font-size: 13px; font-weight: 700; color: #e6edf3; align-self: flex-end; }
+  .kalender-legenda {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: flex-end;
+    margin-top: 10px;
+    font-size: 11px;
+    color: #6e7681;
+  }
+  .kalender-legenda-kotak {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+  @media (max-width: 650px) {
+    .kalender-sel { min-height: 34px; }
+    .kalender-jumlah { font-size: 11px; }
+  }
 
   /* Badge Sentimen */
   .badge-pos { background: #238636; color: #ffffff; padding: 3px 8px; border-radius: 12px; font-weight: 600; font-size: 11px; display: inline-block; }
@@ -325,15 +410,31 @@
     </div>
   </div>
 
+  <!-- Kalender Interaktif -->
+  <div class="kartu-kalender">
+    <div class="kalender-header">
+      <h2>Jumlah Berita / Hari</h2>
+      <div class="kalender-nav">
+        <button id="kalender-prev" title="Bulan sebelumnya">&larr;</button>
+        <div class="kalender-label" id="kalender-label">-</div>
+        <button id="kalender-next" title="Bulan berikutnya">&rarr;</button>
+        <button id="kalender-hari-ini" title="Kembali ke bulan ini">Hari Ini</button>
+      </div>
+    </div>
+    <div class="kalender-grid" id="kalender-grid"></div>
+    <div class="kalender-legenda">
+      <span>Sedikit</span>
+      <span class="kalender-legenda-kotak" style="background:#0d1b2e;"></span>
+      <span class="kalender-legenda-kotak" style="background:#1f3a63;"></span>
+      <span class="kalender-legenda-kotak" style="background:#1f6feb;"></span>
+      <span class="kalender-legenda-kotak" style="background:#79c0ff;"></span>
+      <span>Banyak</span>
+    </div>
+    <div class="petunjuk">Klik tanggal untuk filter tabel/kartu di bawah. Klik lagi untuk membatalkan.</div>
+  </div>
+
   <!-- Grid Grafik -->
   <div class="grafik-grid">
-    <div class="kartu-grafik">
-      <h2>Jumlah Berita / Hari</h2>
-      <div class="chart-container">
-        <canvas id="grafik-per-hari"></canvas>
-      </div>
-      <div class="petunjuk">Klik batang untuk filter tanggal.</div>
-    </div>
     <div class="kartu-grafik">
       <h2>Sentimen</h2>
       <div class="chart-container">
@@ -403,11 +504,13 @@ let modeView = 'card'; // Default: tampilan kartu
 let kolomUrut = null;
 let arahUrut = 1;
 
-let chartHari = null;
 let chartSentimen = null;
 let chartKategori = null;
 let chartMedia = null;
 let timerCari = null;
+
+let kalenderTahun = new Date().getFullYear();
+let kalenderBulan = new Date().getMonth(); // 0 = Januari
 
 const elPilihTanggal = document.getElementById('pilih-tanggal');
 const elPilihMedia = document.getElementById('pilih-media');
@@ -423,6 +526,15 @@ const elBtnExportExcel = document.getElementById('btn-export-excel');
 
 const btnViewTable = document.getElementById('btn-view-table');
 const btnViewCard = document.getElementById('btn-view-card');
+
+const elKalenderGrid = document.getElementById('kalender-grid');
+const elKalenderLabel = document.getElementById('kalender-label');
+const btnKalenderPrev = document.getElementById('kalender-prev');
+const btnKalenderNext = document.getElementById('kalender-next');
+const btnKalenderHariIni = document.getElementById('kalender-hari-ini');
+
+const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const NAMA_HARI_SINGKAT = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 
 const TEMA_GRADASI = {
   hari:            { mulai: '#1f6feb', akhir: '#79c0ff' },
@@ -614,52 +726,96 @@ function renderKPICards(data) {
   document.getElementById('kpi-kategori-sub').textContent = `Kategori topik unik`;
 }
 
-function renderGrafikPerHari() {
+// Menghasilkan warna heatmap (gelap -> terang) berdasarkan proporsi jumlah berita pada hari itu
+// dibandingkan hari dengan jumlah terbanyak dalam bulan yang sedang ditampilkan.
+function warnaIntensitasKalender(jumlah, maksJumlah) {
+  if (jumlah === 0) return '#0d1117';
+  const stops = [
+    { r: 13, g: 27, b: 46 },    // sedikit
+    { r: 31, g: 111, b: 235 },  // sedang
+    { r: 121, g: 199, b: 255 } // banyak
+  ];
+  const rasio = maksJumlah > 0 ? jumlah / maksJumlah : 0;
+  const posisi = rasio * (stops.length - 1);
+  const i0 = Math.floor(posisi);
+  const i1 = Math.min(i0 + 1, stops.length - 1);
+  const t = posisi - i0;
+  const c0 = stops[i0], c1 = stops[i1];
+  const r = Math.round(c0.r + (c1.r - c0.r) * t);
+  const g = Math.round(c0.g + (c1.g - c0.g) * t);
+  const bch = Math.round(c0.b + (c1.b - c0.b) * t);
+  return `rgb(${r}, ${g}, ${bch})`;
+}
+
+function renderKalender() {
+  // Data mengabaikan filter tanggal (sama seperti perilaku grafik sebelumnya) agar
+  // seluruh bulan tetap terlihat, namun tetap menghormati filter media/kategori/sentimen/pencarian.
   const data = dataAbaikanFilter('tanggal');
   const hitung = {};
   for (const b of data) {
-    const tgl = ambilTanggalBaris(b) || 'Tanpa Tanggal';
+    const tgl = ambilTanggalBaris(b);
+    if (!tgl) continue;
     hitung[tgl] = (hitung[tgl] || 0) + 1;
   }
-  const label = Object.keys(hitung).sort((a, b) => new Date(a) - new Date(b));
-  const nilai = label.map(l => hitung[l]);
 
-  const ctx = document.getElementById('grafik-per-hari');
-  if (chartHari) chartHari.destroy();
-  chartHari = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: label,
-      datasets: [{
-        label: 'Berita',
-        data: nilai,
-        backgroundColor: (context) => {
-          const { chart, dataIndex } = context;
-          const { ctx: c, chartArea } = chart;
-          if (filterTanggal && label[dataIndex] !== filterTanggal) return WARNA_REDUP;
-          return buatGradientHorizontal(c, chartArea, TEMA_GRADASI.hari.mulai, TEMA_GRADASI.hari.akhir);
-        },
-        borderRadius: 4
-      }]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      maintainAspectRatio: false,
-      resizeDelay: 100,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' }, beginAtZero: true },
-        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } }
-      },
-      onClick: (evt, elemen) => {
-        if (elemen.length === 0) return;
-        const tgl = label[elemen[0].index];
-        filterTanggal = (filterTanggal === tgl) ? null : tgl;
-        elPilihTanggal.value = filterTanggal || '';
-        renderSemua();
-      }
+  const maksJumlah = Math.max(0, ...Object.values(hitung));
+  const hariIniStr = getTanggalHariIniFormat();
+
+  elKalenderLabel.textContent = `${NAMA_BULAN[kalenderBulan]} ${kalenderTahun}`;
+
+  const tglAwalBulan = new Date(kalenderTahun, kalenderBulan, 1);
+  const jumlahHariBulan = new Date(kalenderTahun, kalenderBulan + 1, 0).getDate();
+  const jumlahHariBulanSebelumnya = new Date(kalenderTahun, kalenderBulan, 0).getDate();
+  const offsetAwal = tglAwalBulan.getDay(); // 0 = Minggu
+
+  const totalSel = Math.ceil((offsetAwal + jumlahHariBulan) / 7) * 7;
+
+  let html = '';
+  NAMA_HARI_SINGKAT.forEach(h => {
+    html += `<div class="kalender-hari-label">${h}</div>`;
+  });
+
+  for (let i = 0; i < totalSel; i++) {
+    const posisiHari = i - offsetAwal + 1;
+
+    if (posisiHari < 1) {
+      const tglLuar = jumlahHariBulanSebelumnya + posisiHari;
+      html += `<div class="kalender-sel luar-bulan"><span class="kalender-tgl">${tglLuar}</span></div>`;
+      continue;
     }
+    if (posisiHari > jumlahHariBulan) {
+      const tglLuar = posisiHari - jumlahHariBulan;
+      html += `<div class="kalender-sel luar-bulan"><span class="kalender-tgl">${tglLuar}</span></div>`;
+      continue;
+    }
+
+    const mm = String(kalenderBulan + 1).padStart(2, '0');
+    const dd = String(posisiHari).padStart(2, '0');
+    const tglStr = `${kalenderTahun}-${mm}-${dd}`;
+    const jumlah = hitung[tglStr] || 0;
+
+    let kelas = 'kalender-sel';
+    if (tglStr === hariIniStr) kelas += ' hari-ini';
+    if (filterTanggal === tglStr) kelas += ' terpilih';
+    else if (filterTanggal) kelas += ' redup';
+
+    const warnaBg = warnaIntensitasKalender(jumlah, maksJumlah);
+
+    html += `<div class="${kelas}" data-tanggal="${tglStr}" style="background:${warnaBg};">
+      <span class="kalender-tgl">${posisiHari}</span>
+      ${jumlah > 0 ? `<span class="kalender-jumlah">${jumlah}</span>` : ''}
+    </div>`;
+  }
+
+  elKalenderGrid.innerHTML = html;
+
+  elKalenderGrid.querySelectorAll('.kalender-sel[data-tanggal]').forEach(sel => {
+    sel.addEventListener('click', () => {
+      const tgl = sel.getAttribute('data-tanggal');
+      filterTanggal = (filterTanggal === tgl) ? null : tgl;
+      elPilihTanggal.value = filterTanggal || '';
+      renderSemua();
+    });
   });
 }
 
@@ -986,7 +1142,7 @@ function renderKartu(data) {
 
 function renderSemua() {
   renderChipFilter();
-  renderGrafikPerHari();
+  renderKalender();
   renderGrafikSentimen();
   renderGrafikKategori();
   renderGrafikMedia();
@@ -995,7 +1151,31 @@ function renderSemua() {
 
 elPilihTanggal.addEventListener('change', (e) => {
   filterTanggal = e.target.value || null;
+  if (filterTanggal) {
+    const [y, m] = filterTanggal.split('-').map(Number);
+    kalenderTahun = y;
+    kalenderBulan = m - 1;
+  }
   renderSemua();
+});
+
+btnKalenderPrev.addEventListener('click', () => {
+  kalenderBulan--;
+  if (kalenderBulan < 0) { kalenderBulan = 11; kalenderTahun--; }
+  renderKalender();
+});
+
+btnKalenderNext.addEventListener('click', () => {
+  kalenderBulan++;
+  if (kalenderBulan > 11) { kalenderBulan = 0; kalenderTahun++; }
+  renderKalender();
+});
+
+btnKalenderHariIni.addEventListener('click', () => {
+  const skrg = new Date();
+  kalenderTahun = skrg.getFullYear();
+  kalenderBulan = skrg.getMonth();
+  renderKalender();
 });
 
 elPilihMedia.addEventListener('change', (e) => {
@@ -1032,6 +1212,9 @@ elResetFilter.addEventListener('click', () => {
   elCari.value = '';
   kolomUrut = null;
   arahUrut = 1;
+  const skrgReset = new Date();
+  kalenderTahun = skrgReset.getFullYear();
+  kalenderBulan = skrgReset.getMonth();
   renderSemua();
 });
 
