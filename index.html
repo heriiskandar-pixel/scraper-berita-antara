@@ -677,9 +677,20 @@ function dataAbaikanFilter(field) {
 function renderKPICards(data) {
   const totalTampil = data.length;
   const totalKeseluruhan = semuaData.length;
-  
-  document.getElementById('kpi-total').textContent = totalTampil;
-  document.getElementById('kpi-total-sub').textContent = `Dari total ${totalKeseluruhan} berita`;
+
+  const elTotal = document.getElementById('kpi-total');
+  const elTotalSub = document.getElementById('kpi-total-sub');
+  const elMediaCount = document.getElementById('kpi-media-count');
+  const elMediaSub = document.getElementById('kpi-media-sub');
+  const elKategoriCount = document.getElementById('kpi-kategori-count');
+  const elKategoriSub = document.getElementById('kpi-kategori-sub');
+
+  // Kartu KPI bersifat opsional pada HTML — hanya diisi jika elemennya ada,
+  // supaya tidak error saat kartu ini dihapus dari tampilan.
+  if (!elTotal && !elMediaCount && !elKategoriCount) return;
+
+  if (elTotal) elTotal.textContent = totalTampil;
+  if (elTotalSub) elTotalSub.textContent = `Dari total ${totalKeseluruhan} berita`;
 
   const mediaSet = new Set();
   const kategoriSet = new Set();
@@ -690,11 +701,11 @@ function renderKPICards(data) {
     pecahKategori(b).forEach(k => kategoriSet.add(k));
   });
 
-  document.getElementById('kpi-media-count').textContent = mediaSet.size;
-  document.getElementById('kpi-media-sub').textContent = `Sumber media unik`;
+  if (elMediaCount) elMediaCount.textContent = mediaSet.size;
+  if (elMediaSub) elMediaSub.textContent = `Sumber media unik`;
 
-  document.getElementById('kpi-kategori-count').textContent = kategoriSet.size;
-  document.getElementById('kpi-kategori-sub').textContent = `Kategori topik unik`;
+  if (elKategoriCount) elKategoriCount.textContent = kategoriSet.size;
+  if (elKategoriSub) elKategoriSub.textContent = `Kategori topik unik`;
 }
 
 // Menghasilkan warna heatmap (gelap -> terang) berdasarkan proporsi jumlah berita pada hari itu
