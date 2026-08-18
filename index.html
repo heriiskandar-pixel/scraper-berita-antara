@@ -167,7 +167,7 @@
   /* Grid Grafik */
   .grafik-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 16px;
     margin-bottom: 20px;
   }
@@ -215,89 +215,80 @@
   }
   .petunjuk { color: #6e7681; font-size: 11px; margin-top: 6px; }
 
-  /* Kalender Interaktif */
-  .kartu-kalender {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 20px;
-  }
+  /* Kalender Interaktif (ukuran mengikuti kartu grafik lainnya) */
   .kalender-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: 4px;
+    margin-bottom: 8px;
   }
-  .kalender-header h2 { font-size: 14px; margin: 0; color: #c9d1d9; }
   .kalender-nav {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
   }
   .kalender-nav button {
-    padding: 4px 10px;
-    font-size: 13px;
-    line-height: 1;
+    padding: 2px 7px;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .kalender-nav button#kalender-hari-ini {
+    font-size: 10px;
+    padding: 2px 6px;
   }
   .kalender-label {
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 600;
     color: #e6edf3;
-    min-width: 130px;
+    min-width: 78px;
     text-align: center;
+    white-space: nowrap;
   }
   .kalender-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 4px;
+    gap: 2px;
   }
   .kalender-hari-label {
     text-align: center;
-    font-size: 11px;
+    font-size: 9px;
     color: #8b949e;
-    padding: 4px 0;
+    padding: 2px 0;
   }
   .kalender-sel {
     position: relative;
     aspect-ratio: 1 / 1;
-    border-radius: 6px;
+    border-radius: 4px;
     border: 1px solid #21262d;
-    padding: 4px 6px;
+    padding: 2px 3px;
     cursor: pointer;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     transition: all 0.15s ease;
-    min-height: 44px;
     min-width: 0;
   }
   .kalender-sel:hover { border-color: #58a6ff; }
-  .kalender-sel.luar-bulan { opacity: 0.2; cursor: default; pointer-events: none; }
+  .kalender-sel.luar-bulan { opacity: 0.15; cursor: default; pointer-events: none; }
   .kalender-sel.redup { opacity: 0.4; }
   .kalender-sel.terpilih { border-color: #58a6ff; border-width: 2px; box-shadow: 0 0 0 1px #58a6ff; opacity: 1; }
   .kalender-sel.hari-ini .kalender-tgl { color: #58a6ff; font-weight: 700; }
-  .kalender-tgl { font-size: 11px; color: #8b949e; }
-  .kalender-jumlah { font-size: 13px; font-weight: 700; color: #e6edf3; align-self: flex-end; }
+  .kalender-tgl { font-size: 9px; color: #8b949e; }
+  .kalender-jumlah { font-size: 10px; font-weight: 700; color: #e6edf3; align-self: flex-end; }
   .kalender-legenda {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     justify-content: flex-end;
-    margin-top: 10px;
-    font-size: 11px;
+    margin-top: 8px;
+    font-size: 9px;
     color: #6e7681;
   }
   .kalender-legenda-kotak {
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
-  }
-  @media (max-width: 650px) {
-    .kalender-sel { min-height: 34px; }
-    .kalender-jumlah { font-size: 11px; }
+    width: 9px;
+    height: 9px;
+    border-radius: 2px;
   }
 
   /* Badge Sentimen */
@@ -410,31 +401,28 @@
     </div>
   </div>
 
-  <!-- Kalender Interaktif -->
-  <div class="kartu-kalender">
-    <div class="kalender-header">
-      <h2>Jumlah Berita / Hari</h2>
-      <div class="kalender-nav">
-        <button id="kalender-prev" title="Bulan sebelumnya">&larr;</button>
-        <div class="kalender-label" id="kalender-label">-</div>
-        <button id="kalender-next" title="Bulan berikutnya">&rarr;</button>
-        <button id="kalender-hari-ini" title="Kembali ke bulan ini">Hari Ini</button>
-      </div>
-    </div>
-    <div class="kalender-grid" id="kalender-grid"></div>
-    <div class="kalender-legenda">
-      <span>Sedikit</span>
-      <span class="kalender-legenda-kotak" style="background:#0d1b2e;"></span>
-      <span class="kalender-legenda-kotak" style="background:#1f3a63;"></span>
-      <span class="kalender-legenda-kotak" style="background:#1f6feb;"></span>
-      <span class="kalender-legenda-kotak" style="background:#79c0ff;"></span>
-      <span>Banyak</span>
-    </div>
-    <div class="petunjuk">Klik tanggal untuk filter tabel/kartu di bawah. Klik lagi untuk membatalkan.</div>
-  </div>
-
   <!-- Grid Grafik -->
   <div class="grafik-grid">
+    <div class="kartu-grafik">
+      <div class="kalender-header">
+        <h2>Jumlah Berita / Hari</h2>
+        <div class="kalender-nav">
+          <button id="kalender-prev" title="Bulan sebelumnya">&larr;</button>
+          <div class="kalender-label" id="kalender-label">-</div>
+          <button id="kalender-next" title="Bulan berikutnya">&rarr;</button>
+        </div>
+      </div>
+      <div class="kalender-grid" id="kalender-grid"></div>
+      <div class="kalender-legenda">
+        <span>Sedikit</span>
+        <span class="kalender-legenda-kotak" style="background:#0d1b2e;"></span>
+        <span class="kalender-legenda-kotak" style="background:#1f3a63;"></span>
+        <span class="kalender-legenda-kotak" style="background:#1f6feb;"></span>
+        <span class="kalender-legenda-kotak" style="background:#79c0ff;"></span>
+        <span>Banyak</span>
+      </div>
+      <div class="petunjuk">Klik tanggal untuk filter. <span id="kalender-hari-ini" style="cursor:pointer; text-decoration:underline;">Kembali ke hari ini</span></div>
+    </div>
     <div class="kartu-grafik">
       <h2>Sentimen</h2>
       <div class="chart-container">
