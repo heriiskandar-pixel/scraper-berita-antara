@@ -8,35 +8,36 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 </head>
-<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+<body class="bg-gray-100 font-sans antialiased">
 
-    <div class="container mx-auto px-4 py-8">
-        <header class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">Dashboard Analisis Berita</h1>
-            <p class="text-sm text-gray-500 mt-1">Monitoring jumlah dan tren berita secara real-time</p>
-        </header>
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Dashboard Monitoring Berita</h1>
+            <p class="text-gray-500 mt-1">Analisis dan statistik berita harian</p>
+        </div>
 
-        <div class="grid grid-cols-1 gap-8">
+        <div class="grid grid-cols-1 gap-6">
             
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <div class="flex justify-between items-center mb-4">
                     <div>
-                        <h2 class="text-lg font-semibold text-gray-900">Kalender Heat Map Jumlah Berita</h2>
-                        <p class="text-xs text-gray-500">Distribusi jumlah berita harian mundur hingga sebulan yang lalu</p>
+                        <h2 class="text-lg font-semibold text-gray-800">Jumlah Berita / Hari (Kalender Heat Map)</h2>
+                        <p class="text-xs text-gray-500">Menampilkan jumlah berita harian dari hari ini mundur sampai sebulan lalu</p>
                     </div>
                 </div>
                 <div id="newsCalendarHeatmap" class="w-full h-72"></div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Kategori Berita Teratas</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">Kategori Berita</h2>
                     <div class="relative h-64">
                         <canvas id="categoryChart"></canvas>
                     </div>
                 </div>
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Sentimen Berita</h2>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">Sentimen Berita</h2>
                     <div class="relative h-64">
                         <canvas id="sentimentChart"></canvas>
                     </div>
@@ -47,32 +48,28 @@
     </div>
 
     <script>
-        // 1. Data Dummy / Generator Data untuk 30 Hari Terakhir (Bisa diganti dengan data dari backend/API Anda)
-        function generateLast30DaysData() {
+        // Fungsi untuk mengambil/menyiapkan data 30 hari terakhir mundur dari hari ini
+        function getRecent30DaysData() {
             const dates = [];
             const counts = [];
-            const weekdays = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-            
             const today = new Date();
+            
             for (let i = 29; i >= 0; i--) {
                 const d = new Date(today);
                 d.setDate(today.getDate() - i);
-                
-                // Format YYYY-MM-DD
                 const dateStr = d.toISOString().split('T')[0];
                 dates.push(dateStr);
                 
-                // Simulasi jumlah berita harian (random antara 0 s.d 25)
+                // Simulasi jumlah berita (bisa Anda ganti dengan data dari backend/database Anda)
                 counts.push(Math.floor(Math.random() * 25));
             }
             return { dates, counts };
         }
 
-        const dataHarian = generateLast30DaysData();
-
-        // 2. Render Kalender Heat Map menggunakan Plotly
-        function renderCalendarHeatmap() {
-            // Mengubah data harian menjadi format matrix untuk Heatmap (Hari dalam seminggu vs Minggu ke-)
+        // Render Kalender Heat Map Interaktif
+        function renderGrafikPerHari() {
+            const dataHarian = getRecent30DaysData();
+            
             let xValues = [];
             let yValues = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
             let zValues = Array(7).fill(0).map(() => Array(dataHarian.dates.length).fill(0));
@@ -80,7 +77,7 @@
 
             dataHarian.dates.forEach((dateStr, index) => {
                 const dateObj = new Date(dateStr);
-                const dayOfWeek = dateObj.getDay(); // 0 (Minggu) - 6 (Sabtu)
+                const dayOfWeek = dateObj.getDay(); // 0 (Minggu) s.d 6 (Sabtu)
                 const count = dataHarian.counts[index];
                 
                 xValues.push(dateStr);
@@ -108,7 +105,7 @@
                     showgrid: false
                 },
                 yaxis: { 
-                    autorange: 'reversed', // Agar urutan Minggu di atas atau Senin di atas sesuai selera
+                    autorange: 'reversed', 
                     showgrid: false 
                 },
                 font: { family: 'inherit' }
@@ -119,32 +116,32 @@
             Plotly.newPlot('newsCalendarHeatmap', [trace], layout, config);
         }
 
-        // 3. Render Chart Pendukung (Contoh menggunakan Chart.js)
+        // Render Grafik Lainnya (Chart.js)
         function renderOtherCharts() {
-            // Kategori Chart
+            // Chart Kategori
             const ctxCat = document.getElementById('categoryChart').getContext('2d');
             new Chart(ctxCat, {
                 type: 'bar',
                 data: {
                     labels: ['Politik', 'Ekonomi', 'Teknologi', 'Olahraga', 'Kriminal'],
                     datasets: [{
-                        label: 'Jumlah Berita',
-                        data: [45, 30, 25, 20, 15],
+                        label: 'Jumlah',
+                        data: [40, 25, 30, 20, 15],
                         backgroundColor: '#3b82f6',
-                        borderRadius: 6
+                        borderRadius: 4
                     }]
                 },
                 options: { responsive: true, maintainAspectRatio: false }
             });
 
-            // Sentimen Chart
+            // Chart Sentimen
             const ctxSent = document.getElementById('sentimentChart').getContext('2d');
             new Chart(ctxSent, {
                 type: 'doughnut',
                 data: {
                     labels: ['Positif', 'Netral', 'Negatif'],
                     datasets: [{
-                        data: [55, 30, 15],
+                        data: [50, 30, 20],
                         backgroundColor: ['#10b981', '#f59e0b', '#ef4444']
                     }]
                 },
@@ -152,9 +149,9 @@
             });
         }
 
-        // Eksekusi saat halaman dimuat
+        // Jalankan fungsi saat halaman selesai dimuat
         window.addEventListener('DOMContentLoaded', () => {
-            renderCalendarHeatmap();
+            renderGrafikPerHari();
             renderOtherCharts();
         });
     </script>
