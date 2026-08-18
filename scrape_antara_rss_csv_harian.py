@@ -33,6 +33,13 @@ MAKS_UMUR_HARI = 7
 MAX_PAGE_INDEKS = 3
 MAX_WORKERS = 12
 
+# Nama model sentimen. Bisa dioverride lewat environment variable SENTIMEN_MODEL_ID
+# supaya gampang diganti tanpa edit kode kalau repo model ini bermasalah.
+SENTIMEN_MODEL_ID = os.environ.get(
+    "SENTIMEN_MODEL_ID",
+    "witosetiadi/indobert-base-cased-sentiment-analysis"
+)
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -72,40 +79,126 @@ def _http_get(url, timeout=15, gunakan_cloudscraper=False):
 # ----------------------------------------------------------------------
 # INISIALISASI MODEL AI SENTIMEN (INDOBERT)
 # ----------------------------------------------------------------------
-print("Memuat model sentimen IndoBERT dari Hugging Face...")
+# Statistik debug sentimen: dipakai untuk melaporkan ringkasan di akhir run,
+# supaya kalau ada masalah (model gagal load / label tidak dikenali / error
+# inferensi) itu KELIHATAN JELAS, bukan cuma diam-diam jadi "Netral" semua.
+_STAT_SENTIMEN = {
+    "sukses": 0,
+    "gagal_load_model": 0,
+    "label_tidak_dikenali": 0,
+    "error_inferensi": 0,
+}
+_LABEL_TIDAK_DIKENALI_CONTOH = set()
+
+print(f"Memuat model sentimen IndoBERT dari Hugging Face ('{SENTIMEN_MODEL_ID}')...")
 try:
     sentimen_pipeline = pipeline(
         "text-classification",
-        model="witosetiadi/indobert-base-cased-sentiment-analysis",
-        tokenizer="witosetiadi/indobert-base-cased-sentiment-analysis"
+        model=SENTIMEN_MODEL_ID,
+        tokenizer=SENTIMEN_MODEL_ID,
+        truncation=True,
+        max_length=512,
     )
-    print("Model IndoBERT berhasil dimuat.\n")
+    # Cetak mapping label ASLI dari model. Ini penting untuk verifikasi manual:
+    # kalau modelnya ternyata memberi label "0"/"1"/"2" polos atau urutan
+    # positif/negatif terbalik, kamu akan langsung tahu dari log ini.
+    id2label = dict(getattr(sentimen_pipeline.model.config, "id2label", {}))
+    print(f"Model IndoBERT berhasil dimuat. Label mapping model: {id2label}")
+
+    # Self-test cepat dengan 3 kalimat contoh yang polaritasnya jelas.
+    # Kalau hasilnya tidak sesuai ekspektasi, kita tahu dari awal (sebelum
+    # scraping ratusan berita) bahwa mapping label perlu disesuaikan.
+    _contoh_uji = [
+        ("Kabar gembira, prestasi ini sungguh membanggakan dan luar biasa", "Positif"),
+        ("Bencana ini sangat menyedihkan dan menimbulkan banyak korban jiwa", "Negatif"),
+        ("Rapat akan dilaksanakan hari Senin pukul sepuluh pagi", "Netral"),
+    ]
+    print("Menjalankan self-test sentimen...")
+    for teks_uji, ekspektasi in _contoh_uji:
+        hasil_uji = sentimen_pipeline(teks_uji)[0]
+        print(f"   - '{teks_uji[:40]}...' -> label mentah: {hasil_uji['label']} "
+              f"(skor {hasil_uji['score']:.2f}) | ekspektasi: {ekspektasi}")
+    print()
 except Exception as e:
-    print(f"Peringatan: Gagal memuat model IndoBERT ({e}). Pengujian sentimen akan menggunakan fallback Netral.")
+    print(f"PERINGATAN KRITIS: Gagal memuat model IndoBERT ({type(e).__name__}: {e}).")
+    print(f"                    -> SEMUA sentimen pada run ini akan menjadi 'Netral'.")
+    print(f"                    -> Cek nama model '{SENTIMEN_MODEL_ID}' benar & tersedia di Hugging Face,")
+    print(f"                       koneksi internet, dan dependency (mis. sentencepiece) sudah terpasang.\n")
     sentimen_pipeline = None
+
+def _normalisasi_label(label_mentah, skor):
+    """
+    Mengubah label mentah dari model (format bisa macam-macam: 'LABEL_0',
+    'POSITIVE', 'positif', '0', dst.) menjadi salah satu dari
+    'Positif' / 'Negatif' / 'Netral'.
+
+    Dibuat lebih permisif daripada versi lama supaya tidak diam-diam
+    menjebloskan hasil yang seharusnya positif/negatif ke 'Netral' hanya
+    karena format labelnya sedikit berbeda dari yang diasumsikan.
+    """
+    l = str(label_mentah).strip().upper()
+
+    kandidat_positif = ("POS", "POSITIF", "LABEL_0", "LABEL0")
+    kandidat_negatif = ("NEG", "NEGATIF", "LABEL_2", "LABEL2")
+    kandidat_netral  = ("NEU", "NET", "NETRAL", "LABEL_1", "LABEL1")
+
+    # Cek label angka polos ("0"/"1"/"2") -- beberapa model fine-tune
+    # tidak diberi id2label yang proper sehingga pipeline mengembalikan
+    # angka mentah alih-alih 'LABEL_0' dst.
+    if l in ("0",):
+        return "Positif"
+    if l in ("2",):
+        return "Negatif"
+    if l in ("1",):
+        return "Netral"
+
+    if any(k in l for k in kandidat_positif):
+        return "Positif"
+    if any(k in l for k in kandidat_negatif):
+        return "Negatif"
+    if any(k in l for k in kandidat_netral):
+        return "Netral"
+
+    # Label benar-benar tidak dikenali format apapun -> catat sebagai
+    # peringatan (bukan langsung dibungkam jadi Netral tanpa jejak).
+    _STAT_SENTIMEN["label_tidak_dikenali"] += 1
+    if label_mentah not in _LABEL_TIDAK_DIKENALI_CONTOH:
+        _LABEL_TIDAK_DIKENALI_CONTOH.add(label_mentah)
+        print(f"   [Peringatan] Label sentimen tidak dikenali: '{label_mentah}' "
+              f"(skor {skor:.2f}) -> sementara diperlakukan sebagai Netral. "
+              f"Tambahkan pemetaannya di _normalisasi_label().")
+    return "Netral"
 
 def analisa_sentimen(judul, ringkasan):
     if not sentimen_pipeline:
+        _STAT_SENTIMEN["gagal_load_model"] += 1
         return "Netral"
-        
+
     teks = f"{judul}. {ringkasan}".strip()
     if not teks:
         return "Netral"
-    
-    teks_input = teks[:512]
-    
+
     try:
-        hasil = sentimen_pipeline(teks_input)[0]
-        label = str(hasil['label']).upper()
-        
-        if "POS" in label or "LABEL_0" in label:
-            return "Positif"
-        elif "NEG" in label or "LABEL_2" in label:
-            return "Negatif"
-        else:
-            return "Netral"
-    except Exception:
+        hasil = sentimen_pipeline(teks)[0]
+        label_hasil = _normalisasi_label(hasil["label"], hasil.get("score", 0.0))
+        _STAT_SENTIMEN["sukses"] += 1
+        return label_hasil
+    except Exception as e:
+        _STAT_SENTIMEN["error_inferensi"] += 1
+        print(f"   [Error sentimen] {type(e).__name__}: {e} (judul: '{judul[:50]}...')")
         return "Netral"
+
+def cetak_ringkasan_sentimen():
+    """Dipanggil di akhir run supaya kelihatan jelas apakah sentimen benar-benar jalan."""
+    print("\n--- Ringkasan Proses Analisis Sentimen ---")
+    print(f"  Berhasil dianalisis      : {_STAT_SENTIMEN['sukses']}")
+    print(f"  Gagal (model tidak load) : {_STAT_SENTIMEN['gagal_load_model']}")
+    print(f"  Gagal (error inferensi)  : {_STAT_SENTIMEN['error_inferensi']}")
+    print(f"  Label tak dikenali       : {_STAT_SENTIMEN['label_tidak_dikenali']}")
+    if _STAT_SENTIMEN["gagal_load_model"] > 0:
+        print("  -> PERHATIAN: model sentimen gagal dimuat di awal run ini, "
+              "semua nilai di atas otomatis 'Netral'. Perbaiki dulu sebelum scraping ulang.")
+    print("-------------------------------------------\n")
 
 # ----------------------------------------------------------------------
 # DAFTAR RSS FEEDS & KANAL INDEKS (DIPERBARUI)
@@ -532,6 +625,8 @@ def main():
     kompas_berita = ambil_indeks_kompas(max_page=MAX_PAGE_INDEKS)
     print(f"{len(kompas_berita)} berita")
     semua_berita.extend(kompas_berita)
+
+    cetak_ringkasan_sentimen()
 
     if not semua_berita:
         print("\nTidak ada berita yang berhasil diambil.")
