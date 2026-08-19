@@ -134,6 +134,62 @@
 
   input[type="text"] { flex: 1; min-width: 200px; }
 
+  /* Multi-select Dropdown */
+  .multiselect { position: relative; min-width: 160px; }
+  .ms-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .ms-toggle-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ms-toggle-arrow { font-size: 10px; color: #8b949e; flex-shrink: 0; }
+  .multiselect.ms-open .ms-toggle { border-color: #58a6ff; }
+  .ms-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 30;
+    width: max-content;
+    min-width: 220px;
+    max-width: 320px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    padding: 8px;
+  }
+  .multiselect.ms-open .ms-panel { display: block; }
+  .ms-search-wrap { margin-bottom: 6px; }
+  .ms-search { width: 100%; padding: 6px 8px; font-size: 12px; }
+  .ms-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .ms-count { font-size: 11px; color: #6e7681; }
+  .ms-clear { background: none; border: none; color: #58a6ff; font-size: 11px; padding: 2px 4px; }
+  .ms-clear:hover { text-decoration: underline; background: none; }
+  .ms-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+  .ms-list::-webkit-scrollbar { width: 6px; }
+  .ms-list::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+  .ms-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .ms-item:hover { background: #21262d; }
+  .ms-item-selected { background: #1f6feb26; }
+  .ms-item input[type="checkbox"] { accent-color: #1f6feb; cursor: pointer; flex-shrink: 0; }
+  .ms-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ms-divider { border-top: 1px solid #21262d; margin: 4px 0; }
+  .ms-empty { color: #6e7681; font-size: 12px; padding: 6px; }
+
   #filter-aktif {
     display: flex;
     gap: 8px;
@@ -431,15 +487,22 @@
 </div>
 
 <div class="kontrol">
-  <select id="pilih-tanggal"><option value="">Semua Tanggal</option></select>
-  <select id="pilih-media"><option value="">Semua Media</option></select>
-  <select id="pilih-sentimen">
-    <option value="">Semua Sentimen</option>
-    <option value="Positif">Positif</option>
-    <option value="Netral">Netral</option>
-    <option value="Negatif">Negatif</option>
-  </select>
-  <select id="pilih-kategori"><option value="">Semua Kategori</option></select>
+  <div class="multiselect" id="ms-tanggal" data-key="tanggal">
+    <button type="button" class="ms-toggle"><span class="ms-toggle-label">Semua Tanggal</span><span class="ms-toggle-arrow">▾</span></button>
+    <div class="ms-panel"></div>
+  </div>
+  <div class="multiselect" id="ms-media" data-key="media">
+    <button type="button" class="ms-toggle"><span class="ms-toggle-label">Semua Media</span><span class="ms-toggle-arrow">▾</span></button>
+    <div class="ms-panel"></div>
+  </div>
+  <div class="multiselect" id="ms-sentimen" data-key="sentimen">
+    <button type="button" class="ms-toggle"><span class="ms-toggle-label">Semua Sentimen</span><span class="ms-toggle-arrow">▾</span></button>
+    <div class="ms-panel"></div>
+  </div>
+  <div class="multiselect" id="ms-kategori" data-key="kategori">
+    <button type="button" class="ms-toggle"><span class="ms-toggle-label">Semua Kategori</span><span class="ms-toggle-arrow">▾</span></button>
+    <div class="ms-panel"></div>
+  </div>
   <input type="text" id="cari" placeholder="Cari kata kunci...">
 
   <div class="group-view">
@@ -465,11 +528,18 @@
 <div id="tabel-wrap"></div>
 
 <script>
-let semuaData = [];        
-let filterTanggal = getTanggalHariIniFormat(); // Set default filter tanggal ke hari ini
-let filterKategori = null; 
-let filterSentimen = null; 
-let filterMedia = null;
+let semuaData = [];
+// Setiap filter kini berupa array (multi-select). Tanggal default: hari ini.
+let filterState = {
+  tanggal: [getTanggalHariIniFormat()],
+  kategori: [],
+  sentimen: [],
+  media: []
+};
+let daftarTanggalGlobal = [];
+let mediaSetGlobal = [];
+let kategoriSetGlobal = [];
+let msSearchTerms = { tanggal: '', media: '', sentimen: '', kategori: '' };
 let modeView = 'card'; // Default: tampilan kartu
 
 let kolomUrut = null;
@@ -483,10 +553,6 @@ let timerCari = null;
 let kalenderTahun = new Date().getFullYear();
 let kalenderBulan = new Date().getMonth(); // 0 = Januari
 
-const elPilihTanggal = document.getElementById('pilih-tanggal');
-const elPilihMedia = document.getElementById('pilih-media');
-const elPilihSentimen = document.getElementById('pilih-sentimen');
-const elPilihKategori = document.getElementById('pilih-kategori');
 const elCari = document.getElementById('cari');
 const elStatus = document.getElementById('status');
 const elTabelWrap = document.getElementById('tabel-wrap');
@@ -516,6 +582,128 @@ const TEMA_GRADASI = {
   sentimenNetral:  { mulai: '#484f58', akhir: '#c9d1d9' }
 };
 const WARNA_REDUP = 'rgba(110,118,129,0.25)';
+
+const MULTI_FILTER_CONFIG = {
+  tanggal: { placeholder: 'Semua Tanggal', getOptions: () => daftarTanggalGlobal, cariBoleh: true },
+  media: { placeholder: 'Semua Media', getOptions: () => mediaSetGlobal, cariBoleh: true },
+  sentimen: { placeholder: 'Semua Sentimen', getOptions: () => ['Positif', 'Netral', 'Negatif'], cariBoleh: false },
+  kategori: { placeholder: 'Semua Kategori', getOptions: () => kategoriSetGlobal, cariBoleh: true }
+};
+
+function toggleMultiSelectValue(key, value) {
+  const arr = filterState[key];
+  const idx = arr.indexOf(value);
+  if (idx === -1) arr.push(value);
+  else arr.splice(idx, 1);
+  renderSemua();
+}
+
+function updateMultiSelectLabel(key) {
+  const wrap = document.getElementById(`ms-${key}`);
+  if (!wrap) return;
+  const config = MULTI_FILTER_CONFIG[key];
+  const sel = filterState[key];
+  const labelEl = wrap.querySelector('.ms-toggle-label');
+  if (sel.length === 0) {
+    labelEl.textContent = config.placeholder;
+  } else if (sel.length === 1) {
+    labelEl.textContent = sel[0];
+  } else {
+    labelEl.textContent = `${sel.length} dipilih: ${sel.slice(0, 2).join(', ')}${sel.length > 2 ? ', ...' : ''}`;
+  }
+  wrap.classList.toggle('ms-punya-pilihan', sel.length > 0);
+}
+
+function renderMultiSelectPanel(key) {
+  const wrap = document.getElementById(`ms-${key}`);
+  if (!wrap) return;
+  const panel = wrap.querySelector('.ms-panel');
+  const config = MULTI_FILTER_CONFIG[key];
+  const selected = filterState[key];
+  let options = config.getOptions();
+
+  const term = (msSearchTerms[key] || '').trim().toLowerCase();
+  if (term) options = options.filter(o => o.toLowerCase().includes(term));
+
+  // Urutkan: opsi yang sudah dipilih tampil di atas agar mudah terlihat,
+  // sisanya tetap mengikuti urutan dasar (tanggal terbaru dulu / abjad).
+  const opsiTerpilih = options.filter(o => selected.includes(o));
+  const opsiLain = options.filter(o => !selected.includes(o));
+
+  let html = '';
+  if (config.cariBoleh) {
+    html += `<div class="ms-search-wrap"><input type="text" class="ms-search" placeholder="Cari..." value="${escapeHtml(msSearchTerms[key] || '')}"></div>`;
+  }
+  html += `<div class="ms-actions"><span class="ms-count">${selected.length} dipilih</span><button type="button" class="ms-clear">Hapus Semua</button></div>`;
+  html += '<div class="ms-list">';
+
+  if (opsiTerpilih.length === 0 && opsiLain.length === 0) {
+    html += '<div class="ms-empty">Tidak ada opsi</div>';
+  }
+
+  opsiTerpilih.forEach(opt => {
+    html += `<label class="ms-item ms-item-selected"><input type="checkbox" value="${escapeHtml(opt)}" checked><span>${escapeHtml(opt)}</span></label>`;
+  });
+  if (opsiTerpilih.length > 0 && opsiLain.length > 0) {
+    html += '<div class="ms-divider"></div>';
+  }
+  opsiLain.forEach(opt => {
+    html += `<label class="ms-item"><input type="checkbox" value="${escapeHtml(opt)}"><span>${escapeHtml(opt)}</span></label>`;
+  });
+
+  html += '</div>';
+  panel.innerHTML = html;
+
+  const searchInput = panel.querySelector('.ms-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      msSearchTerms[key] = e.target.value;
+      renderMultiSelectPanel(key);
+      const inp = panel.querySelector('.ms-search');
+      if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
+    });
+  }
+  panel.querySelector('.ms-clear').addEventListener('click', () => {
+    filterState[key] = [];
+    renderSemua();
+    renderMultiSelectPanel(key);
+  });
+  panel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      toggleMultiSelectValue(key, e.target.value);
+    });
+  });
+}
+
+function refreshOpenMultiSelectPanels() {
+  document.querySelectorAll('.multiselect.ms-open').forEach(wrap => {
+    renderMultiSelectPanel(wrap.dataset.key);
+  });
+}
+
+function tutupSemuaMultiSelect() {
+  document.querySelectorAll('.multiselect.ms-open').forEach(w => w.classList.remove('ms-open'));
+}
+
+function inisialisasiMultiSelect() {
+  document.querySelectorAll('.multiselect').forEach(wrap => {
+    const key = wrap.dataset.key;
+    wrap.querySelector('.ms-toggle').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const sudahTerbuka = wrap.classList.contains('ms-open');
+      tutupSemuaMultiSelect();
+      if (!sudahTerbuka) {
+        wrap.classList.add('ms-open');
+        renderMultiSelectPanel(key);
+        const inp = wrap.querySelector('.ms-search');
+        if (inp) inp.focus();
+      }
+    });
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.multiselect')) tutupSemuaMultiSelect();
+  });
+}
 
 function buatGradientHorizontal(ctx, chartArea, warnaMulai, warnaAkhir) {
   if (!chartArea) return warnaAkhir;
@@ -558,9 +746,6 @@ function ambilTanggalBaris(b) {
   return str.substring(0, 10);
 }
 
-// Mengambil timestamp (tanggal + jam) untuk keperluan pengurutan "terbaru".
-// Mengembalikan 0 jika tidak dapat di-parse, sehingga baris tanpa tanggal valid
-// akan berada di posisi paling akhir saat diurutkan menurun (terbaru dahulu).
 function ambilWaktuBaris(b) {
   const mentah = b._tanggalFile || b['Tanggal Terbit'] || b['Tanggal'] || b['Date'] || '';
   if (!mentah) return 0;
@@ -599,15 +784,10 @@ async function muatSemuaData() {
       if (tgl && tgl !== 'tidak ditemukan') tanggalSet.add(tgl);
     });
 
-    const daftarTanggal = Array.from(tanggalSet).sort((a, b) => new Date(b) - new Date(a));
-
-    elPilihTanggal.innerHTML = '<option value="">Semua Tanggal</option>' +
-      daftarTanggal.map(t => `<option value="${escapeHtml(t)}"${t === filterTanggal ? ' selected' : ''}>${escapeHtml(t)}</option>`).join('');
-
-    // Jika tanggal default hari ini tidak ada di data, opsi dropdown bisa disesuaikan atau dibiarkan
-    elPilihTanggal.value = filterTanggal;
+    daftarTanggalGlobal = Array.from(tanggalSet).sort((a, b) => new Date(b) - new Date(a));
 
     populateFilterOptions();
+    inisialisasiMultiSelect();
     renderSemua();
   } catch (e) {
     elStatus.textContent = 'Gagal memuat data: ' + e.message;
@@ -623,11 +803,8 @@ function populateFilterOptions() {
     pecahKategori(b).forEach(k => kategoriSet.add(k));
   });
 
-  elPilihMedia.innerHTML = '<option value="">Semua Media</option>' +
-    Array.from(mediaSet).sort().map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
-
-  elPilihKategori.innerHTML = '<option value="">Semua Kategori</option>' +
-    Array.from(kategoriSet).sort().map(k => `<option value="${escapeHtml(k)}">${escapeHtml(k)}</option>`).join('');
+  mediaSetGlobal = Array.from(mediaSet).sort();
+  kategoriSetGlobal = Array.from(kategoriSet).sort();
 }
 
 function bersihkanNilai(val) {
@@ -652,11 +829,22 @@ function dataTersaring() {
   const kataKunci = elCari.value.trim().toLowerCase();
   return semuaData.filter(b => {
     if (!cocokPencarian(b, kataKunci)) return false;
-    const tglBaris = ambilTanggalBaris(b);
-    if (filterTanggal && tglBaris !== filterTanggal) return false;
-    if (filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
-    if (filterSentimen && String(b['Sentimen'] ?? '').trim() !== filterSentimen) return false;
-    if (filterMedia && String(b['Media'] ?? '').trim() !== filterMedia) return false;
+    if (filterState.tanggal.length) {
+      const tglBaris = ambilTanggalBaris(b);
+      if (!filterState.tanggal.includes(tglBaris)) return false;
+    }
+    if (filterState.kategori.length) {
+      const katList = pecahKategori(b);
+      if (!katList.some(k => filterState.kategori.includes(k))) return false;
+    }
+    if (filterState.sentimen.length) {
+      const s = String(b['Sentimen'] ?? 'Netral').trim();
+      if (!filterState.sentimen.includes(s)) return false;
+    }
+    if (filterState.media.length) {
+      const m = String(b['Media'] ?? '').trim();
+      if (!filterState.media.includes(m)) return false;
+    }
     return true;
   });
 }
@@ -665,11 +853,22 @@ function dataAbaikanFilter(field) {
   const kataKunci = elCari.value.trim().toLowerCase();
   return semuaData.filter(b => {
     if (!cocokPencarian(b, kataKunci)) return false;
-    const tglBaris = ambilTanggalBaris(b);
-    if (field !== 'tanggal' && filterTanggal && tglBaris !== filterTanggal) return false;
-    if (field !== 'kategori' && filterKategori && !pecahKategori(b).includes(filterKategori)) return false;
-    if (field !== 'sentimen' && filterSentimen && String(b['Sentimen'] ?? '').trim() !== filterSentimen) return false;
-    if (field !== 'media' && filterMedia && String(b['Media'] ?? '').trim() !== filterMedia) return false;
+    if (field !== 'tanggal' && filterState.tanggal.length) {
+      const tglBaris = ambilTanggalBaris(b);
+      if (!filterState.tanggal.includes(tglBaris)) return false;
+    }
+    if (field !== 'kategori' && filterState.kategori.length) {
+      const katList = pecahKategori(b);
+      if (!katList.some(k => filterState.kategori.includes(k))) return false;
+    }
+    if (field !== 'sentimen' && filterState.sentimen.length) {
+      const s = String(b['Sentimen'] ?? 'Netral').trim();
+      if (!filterState.sentimen.includes(s)) return false;
+    }
+    if (field !== 'media' && filterState.media.length) {
+      const m = String(b['Media'] ?? '').trim();
+      if (!filterState.media.includes(m)) return false;
+    }
     return true;
   });
 }
@@ -685,8 +884,6 @@ function renderKPICards(data) {
   const elKategoriCount = document.getElementById('kpi-kategori-count');
   const elKategoriSub = document.getElementById('kpi-kategori-sub');
 
-  // Kartu KPI bersifat opsional pada HTML — hanya diisi jika elemennya ada,
-  // supaya tidak error saat kartu ini dihapus dari tampilan.
   if (!elTotal && !elMediaCount && !elKategoriCount) return;
 
   if (elTotal) elTotal.textContent = totalTampil;
@@ -708,14 +905,12 @@ function renderKPICards(data) {
   if (elKategoriSub) elKategoriSub.textContent = `Kategori topik unik`;
 }
 
-// Menghasilkan warna heatmap (gelap -> terang) berdasarkan proporsi jumlah berita pada hari itu
-// dibandingkan hari dengan jumlah terbanyak dalam bulan yang sedang ditampilkan.
 function warnaIntensitasKalender(jumlah, maksJumlah) {
   if (jumlah === 0) return '#0d1117';
   const stops = [
-    { r: 13, g: 27, b: 46 },    // sedikit
-    { r: 31, g: 111, b: 235 },  // sedang
-    { r: 121, g: 199, b: 255 } // banyak
+    { r: 13, g: 27, b: 46 },
+    { r: 31, g: 111, b: 235 },
+    { r: 121, g: 199, b: 255 }
   ];
   const rasio = maksJumlah > 0 ? jumlah / maksJumlah : 0;
   const posisi = rasio * (stops.length - 1);
@@ -730,8 +925,6 @@ function warnaIntensitasKalender(jumlah, maksJumlah) {
 }
 
 function renderKalender() {
-  // Data mengabaikan filter tanggal (sama seperti perilaku grafik sebelumnya) agar
-  // seluruh bulan tetap terlihat, namun tetap menghormati filter media/kategori/sentimen/pencarian.
   const data = dataAbaikanFilter('tanggal');
   const hitung = {};
   for (const b of data) {
@@ -748,7 +941,7 @@ function renderKalender() {
   const tglAwalBulan = new Date(kalenderTahun, kalenderBulan, 1);
   const jumlahHariBulan = new Date(kalenderTahun, kalenderBulan + 1, 0).getDate();
   const jumlahHariBulanSebelumnya = new Date(kalenderTahun, kalenderBulan, 0).getDate();
-  const offsetAwal = tglAwalBulan.getDay(); // 0 = Minggu
+  const offsetAwal = tglAwalBulan.getDay();
 
   const totalSel = Math.ceil((offsetAwal + jumlahHariBulan) / 7) * 7;
 
@@ -778,8 +971,8 @@ function renderKalender() {
 
     let kelas = 'kalender-sel';
     if (tglStr === hariIniStr) kelas += ' hari-ini';
-    if (filterTanggal === tglStr) kelas += ' terpilih';
-    else if (filterTanggal) kelas += ' redup';
+    if (filterState.tanggal.includes(tglStr)) kelas += ' terpilih';
+    else if (filterState.tanggal.length) kelas += ' redup';
 
     const warnaBg = warnaIntensitasKalender(jumlah, maksJumlah);
 
@@ -794,9 +987,7 @@ function renderKalender() {
   elKalenderGrid.querySelectorAll('.kalender-sel[data-tanggal]').forEach(sel => {
     sel.addEventListener('click', () => {
       const tgl = sel.getAttribute('data-tanggal');
-      filterTanggal = (filterTanggal === tgl) ? null : tgl;
-      elPilihTanggal.value = filterTanggal || '';
-      renderSemua();
+      toggleMultiSelectValue('tanggal', tgl);
     });
   });
 }
@@ -832,7 +1023,7 @@ function renderGrafikSentimen() {
           const { chart, dataIndex } = context;
           const { ctx: c, chartArea } = chart;
           const lbl = label[dataIndex];
-          if (filterSentimen && lbl !== filterSentimen) return WARNA_REDUP;
+          if (filterState.sentimen.length && !filterState.sentimen.includes(lbl)) return WARNA_REDUP;
           const tema = temaPerLabel[lbl];
           return buatGradientHorizontal(c, chartArea, tema.mulai, tema.akhir);
         },
@@ -852,9 +1043,7 @@ function renderGrafikSentimen() {
       onClick: (evt, elemen) => {
         if (elemen.length === 0) return;
         const sentimenDiklik = label[elemen[0].index];
-        filterSentimen = (filterSentimen === sentimenDiklik) ? null : sentimenDiklik;
-        elPilihSentimen.value = filterSentimen || '';
-        renderSemua();
+        toggleMultiSelectValue('sentimen', sentimenDiklik);
       }
     }
   });
@@ -893,7 +1082,7 @@ function renderGrafikKategori() {
         backgroundColor: (context) => {
           const { chart, dataIndex } = context;
           const { ctx: c, chartArea } = chart;
-          if (filterKategori && label[dataIndex] !== filterKategori) return WARNA_REDUP;
+          if (filterState.kategori.length && !filterState.kategori.includes(label[dataIndex])) return WARNA_REDUP;
           return buatGradientHorizontal(c, chartArea, TEMA_GRADASI.kategori.mulai, TEMA_GRADASI.kategori.akhir);
         },
         borderRadius: 4
@@ -912,9 +1101,7 @@ function renderGrafikKategori() {
       onClick: (evt, elemen) => {
         if (elemen.length === 0) return;
         const katDiklik = label[elemen[0].index];
-        filterKategori = (filterKategori === katDiklik) ? null : katDiklik;
-        elPilihKategori.value = filterKategori || '';
-        renderSemua();
+        toggleMultiSelectValue('kategori', katDiklik);
       }
     }
   });
@@ -947,7 +1134,7 @@ function renderGrafikMedia() {
         backgroundColor: (context) => {
           const { chart, dataIndex } = context;
           const { ctx: c, chartArea } = chart;
-          if (filterMedia && label[dataIndex] !== filterMedia) return WARNA_REDUP;
+          if (filterState.media.length && !filterState.media.includes(label[dataIndex])) return WARNA_REDUP;
           return buatGradientHorizontal(c, chartArea, TEMA_GRADASI.media.mulai, TEMA_GRADASI.media.akhir);
         },
         borderRadius: 4
@@ -966,35 +1153,27 @@ function renderGrafikMedia() {
       onClick: (evt, elemen) => {
         if (elemen.length === 0) return;
         const mediaDiklik = label[elemen[0].index];
-        filterMedia = (filterMedia === mediaDiklik) ? null : mediaDiklik;
-        elPilihMedia.value = filterMedia || '';
-        renderSemua();
+        toggleMultiSelectValue('media', mediaDiklik);
       }
     }
   });
 }
 
 function renderChipFilter() {
+  const labelKey = { tanggal: 'Tanggal', media: 'Media', sentimen: 'Sentimen', kategori: 'Kategori' };
   const chip = [];
-  if (filterTanggal) {
-    chip.push(`<span class="chip">Tanggal: ${escapeHtml(filterTanggal)} <button onclick="hapusFilterTanggal()">✕</button></span>`);
-  }
-  if (filterMedia) {
-    chip.push(`<span class="chip">Media: ${escapeHtml(filterMedia)} <button onclick="hapusFilterMedia()">✕</button></span>`);
-  }
-  if (filterSentimen) {
-    chip.push(`<span class="chip">Sentimen: ${escapeHtml(filterSentimen)} <button onclick="hapusFilterSentimen()">✕</button></span>`);
-  }
-  if (filterKategori) {
-    chip.push(`<span class="chip">Kategori: ${escapeHtml(filterKategori)} <button onclick="hapusFilterKategori()">✕</button></span>`);
-  }
+  ['tanggal', 'media', 'sentimen', 'kategori'].forEach(key => {
+    filterState[key].forEach(val => {
+      chip.push(`<span class="chip">${labelKey[key]}: ${escapeHtml(val)} <button data-key="${key}" data-val="${escapeHtml(val)}" class="chip-hapus">✕</button></span>`);
+    });
+  });
   elFilterAktif.innerHTML = chip.join('');
+  elFilterAktif.querySelectorAll('.chip-hapus').forEach(btn => {
+    btn.addEventListener('click', () => {
+      toggleMultiSelectValue(btn.getAttribute('data-key'), btn.getAttribute('data-val'));
+    });
+  });
 }
-
-function hapusFilterTanggal() { filterTanggal = null; elPilihTanggal.value = ''; renderSemua(); }
-function hapusFilterMedia() { filterMedia = null; elPilihMedia.value = ''; renderSemua(); }
-function hapusFilterSentimen() { filterSentimen = null; elPilihSentimen.value = ''; renderSemua(); }
-function hapusFilterKategori() { filterKategori = null; elPilihKategori.value = ''; renderSemua(); }
 
 function renderTampilanUtama() {
   let data = dataTersaring();
@@ -1006,7 +1185,6 @@ function renderTampilanUtama() {
       return va.localeCompare(vb, 'id') * arahUrut;
     });
   } else {
-    // Default: urutkan berdasarkan tanggal & jam terbit terbaru lebih dulu
     data.sort((a, b) => ambilWaktuBaris(b) - ambilWaktuBaris(a));
   }
 
@@ -1129,17 +1307,9 @@ function renderSemua() {
   renderGrafikKategori();
   renderGrafikMedia();
   renderTampilanUtama();
+  ['tanggal', 'media', 'sentimen', 'kategori'].forEach(updateMultiSelectLabel);
+  refreshOpenMultiSelectPanels();
 }
-
-elPilihTanggal.addEventListener('change', (e) => {
-  filterTanggal = e.target.value || null;
-  if (filterTanggal) {
-    const [y, m] = filterTanggal.split('-').map(Number);
-    kalenderTahun = y;
-    kalenderBulan = m - 1;
-  }
-  renderSemua();
-});
 
 btnKalenderPrev.addEventListener('click', () => {
   kalenderBulan--;
@@ -1160,21 +1330,6 @@ btnKalenderHariIni.addEventListener('click', () => {
   renderKalender();
 });
 
-elPilihMedia.addEventListener('change', (e) => {
-  filterMedia = e.target.value || null;
-  renderSemua();
-});
-
-elPilihSentimen.addEventListener('change', (e) => {
-  filterSentimen = e.target.value || null;
-  renderSemua();
-});
-
-elPilihKategori.addEventListener('change', (e) => {
-  filterKategori = e.target.value || null;
-  renderSemua();
-});
-
 elCari.addEventListener('input', () => {
   clearTimeout(timerCari);
   timerCari = setTimeout(() => {
@@ -1183,14 +1338,9 @@ elCari.addEventListener('input', () => {
 });
 
 elResetFilter.addEventListener('click', () => {
-  filterTanggal = null;
-  filterKategori = null;
-  filterSentimen = null;
-  filterMedia = null;
-  elPilihTanggal.value = '';
-  elPilihMedia.value = '';
-  elPilihSentimen.value = '';
-  elPilihKategori.value = '';
+  filterState = { tanggal: [], kategori: [], sentimen: [], media: [] };
+  msSearchTerms = { tanggal: '', media: '', sentimen: '', kategori: '' };
+  tutupSemuaMultiSelect();
   elCari.value = '';
   kolomUrut = null;
   arahUrut = 1;
